@@ -68,8 +68,13 @@ async fn verify_email(
     Extension(config): Extension<Config>,
     axum::extract::Path(token): axum::extract::Path<String>,
 ) -> Result<&'static str> {
+    error!("Starting email verification with token: {}", token);
     let auth_service = AuthService::new(db, config)?;
-    auth_service.verify_email(token).await?;
+    let result = auth_service.verify_email(token).await;
+    if let Err(ref e) = result {
+        error!("Email verification failed: {:?}", e);
+    }
+    result?;
     Ok("Email verified successfully")
 }
 

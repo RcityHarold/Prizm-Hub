@@ -20,7 +20,7 @@ impl EmailService {
             self.config.smtp_password.clone(),
         );
 
-        let transport = SmtpTransport::relay(&self.config.smtp_host)
+        let transport = SmtpTransport::starttls_relay(&self.config.smtp_host)
             .map_err(|e| AuthError::ServerError(format!("Failed to create SMTP transport: {}", e)))?
             .port(self.config.smtp_port)
             .credentials(creds)

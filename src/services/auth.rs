@@ -21,6 +21,7 @@ use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use std::sync::Arc;
+use surrealdb::sql::Thing;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -95,7 +96,7 @@ impl AuthService {
             .ok_or(AuthError::UserNotFound);
         }
 
-        // 检查邮箱是否已被使用
+        // 检查邮箱是否已存在
         if let Some(existing_user) = self.db.find_record_by_field::<User>(
             "user",
             "email",
@@ -117,8 +118,12 @@ impl AuthService {
 
         // 创建新用户
         let now = Utc::now();
+        let id = Thing {
+            tb: "user".to_string(),
+            id: Uuid::new_v4().to_string().into(),
+        };
         let user = User {
-            id: None,
+            id: Some(id.clone()),
             email: user_info.email,
             password_hash: None, // OAuth 用户没有密码
             created_at: now,
@@ -134,7 +139,7 @@ impl AuthService {
             id: None,
             provider: user_info.provider,
             provider_user_id: user_info.provider_user_id,
-            user_id: created_user.id.clone().unwrap().to_string(),
+            user_id: id.id.to_string(),
             created_at: now,
             updated_at: now,
         };
@@ -165,8 +170,12 @@ impl AuthService {
         // 创建用户
         let now = Utc::now();
         let verification_token = Uuid::new_v4().to_string();
+        let id = Thing {
+            tb: "user".to_string(),
+            id: Uuid::new_v4().to_string().into(),
+        };
         let user = User {
-            id: None,
+            id: Some(id),
             email: req.email.clone(),
             password_hash: Some(hashed_password),
             created_at: now,
@@ -177,8 +186,8 @@ impl AuthService {
 
         let created_user = self.db.create_record("user", &user).await?;
         
-        // TODO: 暂时跳过邮件发送
-        // self.email_service.send_verification_email(&req.email, &verification_token).await?;
+        // 发送验证邮件
+        self.email_service.send_verification_email(&req.email, &verification_token).await?;
         
         // 创建会话
         self.create_session(created_user).await
@@ -253,10 +262,12 @@ impl AuthService {
         updated_user.is_email_verified = true;
         updated_user.verification_token = None;
         updated_user.updated_at = Utc::now();
+        // 保持原始 id
+        updated_user.id = user.id.clone();
 
         self.db.update_record(
             "user",
-            &user.id.unwrap().to_string(),
+            user.id.as_ref().unwrap(),
             &updated_user,
         ).await?;
 

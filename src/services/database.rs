@@ -154,17 +154,14 @@ impl Database {
         Ok(records.into_iter().next())
     }
 
-    pub async fn update_record<T>(&self, table: &str, id: &str, record: &T) -> Result<T>
+    pub async fn update_record<T>(&self, table: &str, thing: &Thing, record: &T) -> Result<T>
     where
         T: serde::Serialize + serde::de::DeserializeOwned + Clone + Debug,
     {
-        debug!("Updating record in table {} with id {}: {:?}", table, id, record);
+        debug!("Updating record in table {} with thing {:?}: {:?}", table, thing, record);
         
-        let thing: Thing = format!("{}:{}", table, id).parse()
-            .map_err(|_| AuthError::DatabaseError("Invalid record ID format".into()))?;
-            
         let updated = self.client
-            .update(thing)
+            .update(thing.clone())
             .content(record)
             .await
             .map_err(|_| AuthError::DatabaseError("Failed to update record".into()))?;
