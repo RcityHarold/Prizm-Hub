@@ -77,8 +77,8 @@ impl Database {
                 DEFINE FIELD password ON user TYPE string;
                 DEFINE FIELD verified ON user TYPE bool;
                 DEFINE FIELD verification_token ON user TYPE string;
-                DEFINE FIELD created_at ON user TYPE datetime;
-                DEFINE FIELD updated_at ON user TYPE datetime;
+                DEFINE FIELD created_at ON user TYPE number;
+                DEFINE FIELD updated_at ON user TYPE number;
                 DEFINE INDEX email_idx ON user COLUMNS email UNIQUE;
             "#;
             self.client.query(user_table).await?;
@@ -91,8 +91,8 @@ impl Database {
                 DEFINE FIELD provider ON identity_provider TYPE string;
                 DEFINE FIELD provider_user_id ON identity_provider TYPE string;
                 DEFINE FIELD user_id ON identity_provider TYPE record(user);
-                DEFINE FIELD created_at ON identity_provider TYPE datetime;
-                DEFINE FIELD updated_at ON identity_provider TYPE datetime;
+                DEFINE FIELD created_at ON identity_provider TYPE number;
+                DEFINE FIELD updated_at ON identity_provider TYPE number;
                 DEFINE INDEX provider_idx ON identity_provider COLUMNS provider, provider_user_id UNIQUE;
             "#;
             self.client.query(identity_provider).await?;
@@ -104,8 +104,8 @@ impl Database {
                 DEFINE TABLE session SCHEMAFULL;
                 DEFINE FIELD user_id ON session TYPE record(user);
                 DEFINE FIELD token ON session TYPE string;
-                DEFINE FIELD expires_at ON session TYPE datetime;
-                DEFINE FIELD created_at ON session TYPE datetime;
+                DEFINE FIELD expires_at ON session TYPE number;
+                DEFINE FIELD created_at ON session TYPE number;
                 DEFINE FIELD user_agent ON session TYPE string;
                 DEFINE FIELD ip_address ON session TYPE string;
                 DEFINE INDEX token_idx ON session COLUMNS token UNIQUE;
@@ -126,9 +126,10 @@ impl Database {
             .create(table)
             .content(record)
             .await
-            .map_err(|_| AuthError::DatabaseError("Failed to create record".into()))?;
+            .map_err(|e| AuthError::DatabaseError(format!("Failed to create record: {}", e)))?;
             
-        created.into_iter().next()
+        created.into_iter()
+            .next()
             .ok_or_else(|| AuthError::DatabaseError("Failed to create record".into()))
     }
 
@@ -136,10 +137,20 @@ impl Database {
     where
         T: serde::de::DeserializeOwned + Clone + Debug,
     {
-        let sql = format!("SELECT * FROM {} WHERE {} = '{}'", table, field, value);
-        let mut result = self.client.query(sql).await?;
-        let records: Vec<T> = result.take(0)
-            .map_err(|_| AuthError::DatabaseError("Failed to find record".into()))?;
+        debug!("Finding record in table {} where {} = {}", table, field, value);
+        
+        let query = format!("SELECT * FROM {} WHERE {} = $value", table, field);
+        let mut result = self.client
+            .query(&query)
+            .bind(("value", value))
+            .await
+            .map_err(|e| AuthError::DatabaseError(format!("Failed to execute query: {}", e)))?;
+        
+        let records: Vec<T> = result
+            .take(0)
+            .map_err(|e| AuthError::DatabaseError(format!("Failed to parse records: {}", e)))?;
+            
+        dbg!(&records);
         Ok(records.into_iter().next())
     }
 

@@ -1,14 +1,18 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-
+use surrealdb::sql::Thing;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
-    pub id: Option<String>,
+    pub id: Option<Thing>, 
     pub email: String,
+    #[serde(rename = "password")]
     pub password_hash: Option<String>,
+    #[serde(with = "chrono::serde::ts_seconds")]
     pub created_at: DateTime<Utc>,
+    #[serde(with = "chrono::serde::ts_seconds")]
     pub updated_at: DateTime<Utc>,
-    pub email_verified: bool,
+    #[serde(rename = "verified")]
+    pub is_email_verified: bool,
     pub verification_token: Option<String>,
 }
 
@@ -34,6 +38,7 @@ pub struct AuthResponse {
 pub struct UserResponse {
     pub id: String,
     pub email: String,
-    pub email_verified: bool,
+    #[serde(rename = "verified")]
+    pub is_email_verified: bool,
     pub created_at: DateTime<Utc>,
 }

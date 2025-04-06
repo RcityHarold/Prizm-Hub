@@ -123,7 +123,7 @@ impl AuthService {
             password_hash: None, // OAuth 用户没有密码
             created_at: now,
             updated_at: now,
-            email_verified: true, // OAuth 邮箱已验证
+            is_email_verified: true, // OAuth 邮箱已验证
             verification_token: None,
         };
 
@@ -157,7 +157,7 @@ impl AuthService {
         // 生成密码哈希
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
-        let password_hash = argon2
+        let hashed_password = argon2
             .hash_password(req.password.as_bytes(), &salt)
             .map_err(|e| AuthError::ServerError(e.to_string()))?
             .to_string();
@@ -168,10 +168,10 @@ impl AuthService {
         let user = User {
             id: None,
             email: req.email.clone(),
-            password_hash: Some(password_hash),
+            password_hash: Some(hashed_password),
             created_at: now,
             updated_at: now,
-            email_verified: false,
+            is_email_verified: false,
             verification_token: Some(verification_token.clone()),
         };
 
@@ -205,7 +205,7 @@ impl AuthService {
             .map_err(|_| AuthError::InvalidCredentials)?;
 
         // 检查邮箱验证状态
-        if !user.email_verified {
+        if !user.is_email_verified {
             return Err(AuthError::EmailNotVerified);
         }
 
@@ -235,7 +235,7 @@ impl AuthService {
             user: UserResponse {
                 id: user.id.as_ref().unwrap().to_string(),
                 email: user.email,
-                email_verified: user.email_verified,
+                is_email_verified: user.is_email_verified,
                 created_at: user.created_at,
             },
         })
@@ -250,7 +250,7 @@ impl AuthService {
         .ok_or(AuthError::InvalidToken)?;
 
         let mut updated_user = user.clone();
-        updated_user.email_verified = true;
+        updated_user.is_email_verified = true;
         updated_user.verification_token = None;
         updated_user.updated_at = Utc::now();
 

@@ -88,7 +88,7 @@ async fn get_current_user(
     Ok(Json(UserResponse {
         id: claims.sub,
         email: user.email,
-        email_verified: user.email_verified,
+        is_email_verified: user.is_email_verified,
         created_at: user.created_at,
     }))
 }
