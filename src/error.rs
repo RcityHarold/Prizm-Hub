@@ -1,0 +1,59 @@
+use axum::http::{StatusCode, header};
+use thiserror::Error;
+use surrealdb::Error as SurrealDBError;
+
+#[derive(Debug, Error)]
+pub enum AuthError {
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+    
+    #[error("Invalid credentials")]
+    InvalidCredentials,
+    
+    #[error("Email not verified")]
+    EmailNotVerified,
+    
+    #[error("Token error: {0}")]
+    TokenError(String),
+    
+    #[error("User not found")]
+    UserNotFound,
+    
+    #[error("Email already exists")]
+    EmailExists,
+    
+    #[error("Invalid token")]
+    InvalidToken,
+    
+    #[error("Server error: {0}")]
+    ServerError(String),
+    
+    #[error("OAuth error: {0}")]
+    OAuthError(String),
+}
+
+impl From<reqwest::Error> for AuthError {
+    fn from(err: reqwest::Error) -> Self {
+        AuthError::DatabaseError(err.to_string())
+    }
+}
+
+impl From<serde_json::Error> for AuthError {
+    fn from(err: serde_json::Error) -> Self {
+        AuthError::DatabaseError(err.to_string())
+    }
+}
+
+impl From<header::InvalidHeaderValue> for AuthError {
+    fn from(err: header::InvalidHeaderValue) -> Self {
+        AuthError::DatabaseError(err.to_string())
+    }
+}
+
+impl From<SurrealDBError> for AuthError {
+    fn from(err: SurrealDBError) -> Self {
+        AuthError::DatabaseError(err.to_string())
+    }
+}
+
+pub type Result<T> = std::result::Result<T, AuthError>;
