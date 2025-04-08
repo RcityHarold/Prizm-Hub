@@ -1,14 +1,17 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use surrealdb::sql::Thing;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
 pub struct IdentityProvider {
-    pub id: Option<String>,
+    pub id: Thing,
     pub provider: String,
     pub provider_user_id: String,
-    pub user_id: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    #[serde(rename = "user_id")]
+    pub user_id: Thing,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

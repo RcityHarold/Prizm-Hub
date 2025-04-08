@@ -13,6 +13,9 @@ pub struct Config {
     pub github_client_id: String,
     pub github_client_secret: String,
     pub oauth_redirect_url: String,
+    // 代理配置
+    pub proxy_enabled: bool,
+    pub proxy_url: Option<String>,
     // 邮件配置
     pub smtp_host: String,
     pub smtp_port: u16,
@@ -47,6 +50,11 @@ impl Config {
                 .expect("GITHUB_CLIENT_SECRET must be set"),
             oauth_redirect_url: env::var("OAUTH_REDIRECT_URL")
                 .expect("OAUTH_REDIRECT_URL must be set"),
+            // 代理配置
+            proxy_enabled: env::var("PROXY_ENABLED")
+                .map(|v| v.parse().unwrap_or(false))
+                .unwrap_or(false),
+            proxy_url: env::var("PROXY_URL").ok(),
             smtp_host: env::var("SMTP_HOST")
                 .expect("SMTP_HOST must be set"),
             smtp_port: env::var("SMTP_PORT")

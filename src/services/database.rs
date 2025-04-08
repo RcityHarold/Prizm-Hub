@@ -74,14 +74,21 @@ impl Database {
             let user_table = r#"
                 DEFINE TABLE user SCHEMAFULL;
                 DEFINE FIELD email ON user TYPE string;
-                DEFINE FIELD password ON user TYPE string;
+                DEFINE FIELD password ON user TYPE option<string>;
                 DEFINE FIELD verified ON user TYPE bool;
-                DEFINE FIELD verification_token ON user TYPE string;
+                DEFINE FIELD verification_token ON user TYPE option<string>;
                 DEFINE FIELD created_at ON user TYPE number;
                 DEFINE FIELD updated_at ON user TYPE number;
                 DEFINE INDEX email_idx ON user COLUMNS email UNIQUE;
             "#;
             self.client.query(user_table).await?;
+        } else {
+            // 更新现有表的 schema
+            let update_user_table = r#"
+                DEFINE FIELD password ON user TYPE option<string>;
+                DEFINE FIELD verification_token ON user TYPE option<string>;
+            "#;
+            self.client.query(update_user_table).await?;
         }
 
         // 身份提供商表
@@ -139,7 +146,12 @@ impl Database {
     {
         debug!("Finding record in table {} where {} = {}", table, field, value);
         
-        let query = format!("SELECT * FROM {} WHERE {} = $value", table, field);
+        let query = if field == "id" {
+            format!("SELECT * FROM {} WHERE id = type::thing($value)", table)
+        } else {
+            format!("SELECT * FROM {} WHERE {} = $value", table, field)
+        };
+
         let mut result = self.client
             .query(&query)
             .bind(("value", value))

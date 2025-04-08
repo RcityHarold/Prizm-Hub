@@ -6,9 +6,18 @@ use crate::{
 use oauth2::{
     basic::BasicClient,
     reqwest::async_http_client,
-    AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenResponse, TokenUrl,
+    AuthUrl,
+    ClientId,
+    ClientSecret,
+    RedirectUrl,
+    TokenUrl,
+    Scope,
+    CsrfToken,
+    TokenResponse,
 };
 use serde::Deserialize;
+use tracing::{error, info};
+use reqwest::{Client, Proxy};
 
 #[derive(Debug, Deserialize)]
 struct GoogleUserInfo {
@@ -79,9 +88,29 @@ impl OAuthService {
         })
     }
 
+    // 创建一个配置了代理的 HTTP 客户端
+    fn create_http_client(&self) -> Result<Client> {
+        let mut client_builder = Client::builder()
+            .danger_accept_invalid_certs(true);  // 允许自签名证书
+        
+        if self.config.proxy_enabled {
+            if let Some(proxy_url) = &self.config.proxy_url {
+                let proxy_url = proxy_url.replace("https://", "http://");  // 强制使用 http 协议
+                info!("Using proxy: {}", proxy_url);
+                client_builder = client_builder.proxy(
+                    Proxy::all(&proxy_url)
+                        .map_err(|e| AuthError::OAuthError(format!("Failed to create proxy: {}", e)))?
+                );
+            }
+        }
+
+        client_builder
+            .build()
+            .map_err(|e| AuthError::OAuthError(format!("Failed to create HTTP client: {}", e)))
+    }
+
     pub fn get_google_auth_url(&self) -> Result<String> {
-        let (auth_url, _) = self
-            .google_client
+        let (auth_url, _) = self.google_client
             .authorize_url(|| CsrfToken::new(uuid::Uuid::new_v4().to_string()))
             .add_scope(Scope::new(
                 "https://www.googleapis.com/auth/userinfo.email".to_string(),
@@ -94,6 +123,71 @@ impl OAuthService {
         Ok(auth_url.to_string())
     }
 
+    pub async fn handle_google_callback(&self, code: String) -> Result<OAuthUserInfo> {
+        info!("Starting Google OAuth callback with code: {}", code);
+        
+        // 交换授权码获取访问令牌
+        info!("Exchanging authorization code for access token");
+        let token = if self.config.proxy_enabled {
+            let client = self.create_http_client()?;
+            self.google_client
+                .exchange_code(oauth2::AuthorizationCode::new(code))
+                .request_async(async_http_client)
+                .await
+        } else {
+            self.google_client
+                .exchange_code(oauth2::AuthorizationCode::new(code))
+                .request_async(async_http_client)
+                .await
+        }.map_err(|e| AuthError::OAuthError(e.to_string()))?;
+
+        // 使用访问令牌获取用户信息
+        info!("Fetching user info from Google API");
+        let client = if self.config.proxy_enabled {
+            self.create_http_client()?
+        } else {
+            Client::new()
+        };
+
+        let user_info: GoogleUserInfo = match client
+            .get("https://www.googleapis.com/oauth2/v2/userinfo")
+            .bearer_auth(token.access_token().secret())
+            .send()
+            .await {
+                Ok(response) => {
+                    info!("Received response from Google API");
+                    match response.json().await {
+                        Ok(info) => {
+                            info!("Successfully parsed user info");
+                            info
+                        },
+                        Err(e) => {
+                            error!("Failed to parse user info: {}", e);
+                            return Err(AuthError::OAuthError(e.to_string()));
+                        }
+                    }
+                },
+                Err(e) => {
+                    error!("Failed to fetch user info: {}", e);
+                    return Err(AuthError::OAuthError(e.to_string()));
+                }
+            };
+
+        if !user_info.verified_email {
+            error!("User email is not verified");
+            return Err(AuthError::EmailNotVerified);
+        }
+
+        info!("Successfully completed Google OAuth callback for user: {}", user_info.email);
+        Ok(OAuthUserInfo {
+            provider: "google".to_string(),
+            provider_user_id: user_info.id,
+            email: user_info.email,
+            name: user_info.name,
+            picture: user_info.picture,
+        })
+    }
+
     pub fn get_github_auth_url(&self) -> Result<String> {
         let (auth_url, _) = self
             .github_client
@@ -104,50 +198,26 @@ impl OAuthService {
         Ok(auth_url.to_string())
     }
 
-    pub async fn handle_google_callback(&self, code: String) -> Result<OAuthUserInfo> {
-        // 交换授权码获取访问令牌
-        let token = self
-            .google_client
-            .exchange_code(oauth2::AuthorizationCode::new(code))
-            .request_async(async_http_client)
-            .await
-            .map_err(|e| AuthError::OAuthError(e.to_string()))?;
-
-        // 使用访问令牌获取用户信息
-        let client = reqwest::Client::new();
-        let user_info: GoogleUserInfo = client
-            .get("https://www.googleapis.com/oauth2/v2/userinfo")
-            .bearer_auth(token.access_token().secret())
-            .send()
-            .await
-            .map_err(|e| AuthError::OAuthError(e.to_string()))?
-            .json()
-            .await
-            .map_err(|e| AuthError::OAuthError(e.to_string()))?;
-
-        if !user_info.verified_email {
-            return Err(AuthError::EmailNotVerified);
-        }
-
-        Ok(OAuthUserInfo {
-            provider: "google".to_string(),
-            provider_user_id: user_info.id,
-            email: user_info.email,
-            name: user_info.name,
-            picture: user_info.picture,
-        })
-    }
-
     pub async fn handle_github_callback(&self, code: String) -> Result<OAuthUserInfo> {
         // 交换授权码获取访问令牌
-        let token = self
-            .github_client
-            .exchange_code(oauth2::AuthorizationCode::new(code))
-            .request_async(async_http_client)
-            .await
-            .map_err(|e| AuthError::OAuthError(e.to_string()))?;
+        let token = if self.config.proxy_enabled {
+            let client = self.create_http_client()?;
+            self.github_client
+                .exchange_code(oauth2::AuthorizationCode::new(code))
+                .request_async(async_http_client)
+                .await
+        } else {
+            self.github_client
+                .exchange_code(oauth2::AuthorizationCode::new(code))
+                .request_async(async_http_client)
+                .await
+        }.map_err(|e| AuthError::OAuthError(e.to_string()))?;
 
-        let client = reqwest::Client::new();
+        let client = if self.config.proxy_enabled {
+            self.create_http_client()?
+        } else {
+            Client::new()
+        };
         
         // 获取用户信息
         let user_info: GitHubUserInfo = client

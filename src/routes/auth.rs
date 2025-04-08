@@ -1,7 +1,7 @@
 use crate::{
     config::Config,
     error::{AuthError, Result},
-    models::user::{CreateUserRequest, LoginRequest, AuthResponse, UserResponse},
+    models::user::{CreateUserRequest, LoginRequest, AuthResponse, UserResponse, InitializePasswordRequest},
     services::auth::AuthService,
     utils::jwt::Claims,
 };
@@ -10,6 +10,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
     Extension,
+    response::IntoResponse,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -28,6 +29,7 @@ pub fn router(db: Arc<Database>) -> Router {
         .route("/login", post(login))
         .route("/verify-email/:token", get(verify_email))
         .route("/me", get(get_current_user))
+        .route("/initialize-password", post(initialize_password))
         // OAuth 路由
         .route("/login/google", get(google_login))
         .route("/callback/google", get(google_callback))
@@ -90,12 +92,7 @@ async fn get_current_user(
         .await?
         .ok_or(AuthError::UserNotFound)?;
 
-    Ok(Json(UserResponse {
-        id: claims.sub,
-        email: user.email,
-        is_email_verified: user.is_email_verified,
-        created_at: user.created_at,
-    }))
+    Ok(Json(UserResponse::from(user)))
 }
 
 // Google 登录
@@ -113,13 +110,28 @@ async fn google_callback(
     State(db): State<Arc<Database>>,
     Extension(config): Extension<Config>,
     Query(params): Query<OAuthCallback>,
-) -> Result<axum::response::Redirect> {
+) -> Result<axum::response::Response> {
+    error!("Starting Google callback with code: {}", params.code);
     let auth_service = AuthService::new(db, config)?;
-    let auth_response = auth_service.handle_google_callback(params.code).await?;
+    let auth_response = match auth_service.handle_google_callback(params.code).await {
+        Ok(response) => response,
+        Err(e) => {
+            error!("Google callback failed: {:?}", e);
+            return Err(e);
+        }
+    };
     
-    // 在实际应用中，你可能想要将用户重定向到前端应用，并将令牌作为URL参数传递
-    let redirect_url = format!("/login/success?token={}", auth_response.token);
-    Ok(axum::response::Redirect::to(&redirect_url))
+    // 检查用户是否有密码
+    let redirect_url = if !auth_response.user.has_password {
+        // 重定向到设置密码页面，并传递 token
+        format!("http://localhost:3000/initialize-password?token={}", auth_response.token)
+    } else {
+        // 正常重定向到前端，并传递 token
+        format!("http://localhost:3000?token={}", auth_response.token)
+    };
+
+    error!("Redirecting to: {}", redirect_url);
+    Ok(axum::response::Redirect::to(&redirect_url).into_response())
 }
 
 // GitHub 登录
@@ -137,13 +149,32 @@ async fn github_callback(
     State(db): State<Arc<Database>>,
     Extension(config): Extension<Config>,
     Query(params): Query<OAuthCallback>,
-) -> Result<axum::response::Redirect> {
+) -> Result<axum::response::Response> {
     let auth_service = AuthService::new(db, config)?;
     let auth_response = auth_service.handle_github_callback(params.code).await?;
     
-    // 在实际应用中，你可能想要将用户重定向到前端应用，并将令牌作为URL参数传递
-    let redirect_url = format!("/login/success?token={}", auth_response.token);
-    Ok(axum::response::Redirect::to(&redirect_url))
+    // 检查用户是否有密码
+    let redirect_url = if !auth_response.user.has_password {
+        // 重定向到设置密码页面，并传递 token
+        format!("http://localhost:3000/initialize-password?token={}", auth_response.token)
+    } else {
+        // 正常重定向到前端，并传递 token
+        format!("http://localhost:3000?token={}", auth_response.token)
+    };
+
+    Ok(axum::response::Redirect::to(&redirect_url).into_response())
+}
+
+// 初始化密码处理函数
+async fn initialize_password(
+    State(db): State<Arc<Database>>,
+    Extension(config): Extension<Config>,
+    claims: Claims,
+    Json(request): Json<InitializePasswordRequest>,
+) -> Result<Json<UserResponse>> {
+    let auth_service = AuthService::new(db, config)?;
+    let user = auth_service.initialize_password(&claims.sub, &request.password).await?;
+    Ok(Json(user.into()))
 }
 
 // 错误处理中间件
@@ -185,6 +216,14 @@ impl axum::response::IntoResponse for AuthError {
             AuthError::OAuthError(_) => (
                 axum::http::StatusCode::BAD_REQUEST,
                 "OAuth error",
+            ),
+            AuthError::PasswordAlreadySet => (
+                axum::http::StatusCode::CONFLICT,
+                "Password already set",
+            ),
+            AuthError::InvalidUserId => (
+                axum::http::StatusCode::BAD_REQUEST,
+                "Invalid user ID",
             ),
         };
 

@@ -30,23 +30,29 @@ pub enum AuthError {
     
     #[error("OAuth error: {0}")]
     OAuthError(String),
+    
+    #[error("Password already set")]
+    PasswordAlreadySet,
+    
+    #[error("Invalid user ID")]
+    InvalidUserId,
 }
 
 impl From<reqwest::Error> for AuthError {
     fn from(err: reqwest::Error) -> Self {
-        AuthError::DatabaseError(err.to_string())
+        AuthError::OAuthError(err.to_string())
     }
 }
 
 impl From<serde_json::Error> for AuthError {
     fn from(err: serde_json::Error) -> Self {
-        AuthError::DatabaseError(err.to_string())
+        AuthError::ServerError(format!("JSON error: {}", err))
     }
 }
 
 impl From<header::InvalidHeaderValue> for AuthError {
     fn from(err: header::InvalidHeaderValue) -> Self {
-        AuthError::DatabaseError(err.to_string())
+        AuthError::ServerError(format!("Invalid header value: {}", err))
     }
 }
 
