@@ -3,8 +3,9 @@ use crate::{
     error::{AuthError, Result},
     models::{
         user::{User, CreateUserRequest, AuthResponse, UserResponse},
-        session::Session,
         identity_provider::{IdentityProvider, OAuthUserInfo},
+        password_reset::{PasswordResetToken, RequestPasswordResetRequest, ResetPasswordRequest},
+        session::{Session, SessionInfo},
     },
     services::{
         database::Database,
@@ -29,6 +30,7 @@ struct Claims {
     sub: String,
     exp: i64,
     iat: i64,
+    session_id: Option<String>,
 }
 
 pub struct AuthService {
@@ -227,8 +229,11 @@ impl AuthService {
         // 发送验证邮件
         self.email_service.send_verification_email(&req.email, &verification_token).await?;
         
-        // 创建会话
-        self.create_session(created_user).await
+        // 不立即创建会话，而是返回成功消息
+        Ok(AuthResponse {
+            token: "".to_string(), // 空令牌，表示需要验证邮箱
+            user: created_user.into(),
+        })
     }
 
     pub async fn login(&self, email: String, password: String) -> Result<AuthResponse> {
@@ -261,13 +266,35 @@ impl AuthService {
     }
 
     async fn create_session(&self, user: User) -> Result<AuthResponse> {
+        self.create_session_with_metadata(user, "Unknown".to_string(), "0.0.0.0".to_string()).await
+    }
+
+    async fn create_session_with_metadata(&self, user: User, user_agent: String, ip_address: String) -> Result<AuthResponse> {
         let now = Utc::now();
         let exp = now + Duration::hours(24); // 24小时后过期
 
+        // 创建会话记录
+        let session_id = Thing {
+            tb: "session".to_string(),
+            id: Uuid::new_v4().to_string().into(),
+        };
+
+        let session = Session {
+            id: Some(session_id.clone()),
+            user_id: user.id.as_ref().unwrap().clone(),
+            token: "".to_string(), // 临时空值，稍后更新
+            expires_at: exp.timestamp(),
+            created_at: now.timestamp(),
+            user_agent,
+            ip_address,
+        };
+
+        // 创建JWT claims，包含session_id
         let claims = Claims {
             sub: user.id.as_ref().unwrap().to_string(),
             exp: exp.timestamp(),
             iat: now.timestamp(),
+            session_id: Some(session_id.to_string()),
         };
 
         let token = encode(
@@ -276,6 +303,13 @@ impl AuthService {
             &EncodingKey::from_secret(self.config.jwt_secret.as_bytes()),
         )
         .map_err(|e| AuthError::TokenError(e.to_string()))?;
+
+        // 更新会话记录的token
+        let mut session_with_token = session;
+        session_with_token.token = token.clone();
+
+        // 保存会话到数据库
+        self.db.create_record("session", &session_with_token).await?;
 
         Ok(AuthResponse {
             token,
@@ -288,10 +322,30 @@ impl AuthService {
         let now = Utc::now();
         let exp = now + Duration::hours(24); // 24小时后过期
 
+        // 创建会话记录
+        let session_id = Thing {
+            tb: "session".to_string(),
+            id: Uuid::new_v4().to_string().into(),
+        };
+
+        let user_thing: Thing = format!("user:{}", user_id).parse()
+            .map_err(|_| AuthError::InvalidUserId)?;
+
+        let session = Session {
+            id: Some(session_id.clone()),
+            user_id: user_thing,
+            token: "".to_string(), // 临时空值，稍后更新
+            expires_at: exp.timestamp(),
+            created_at: now.timestamp(),
+            user_agent: "OAuth".to_string(),
+            ip_address: "0.0.0.0".to_string(),
+        };
+
         let claims = Claims {
             sub: user_id.to_string(),
             exp: exp.timestamp(),
             iat: now.timestamp(),
+            session_id: Some(session_id.to_string()),
         };
         debug!("Created JWT claims: {:?}", claims);
 
@@ -304,18 +358,30 @@ impl AuthService {
             error!("Failed to create JWT token: {}", e);
             AuthError::TokenError(e.to_string())
         })?;
+
+        // 更新会话记录的token
+        let mut session_with_token = session;
+        session_with_token.token = token.clone();
+
+        // 保存会话到数据库
+        self.db.create_record("session", &session_with_token).await?;
         debug!("JWT token created successfully");
 
         Ok(token)
     }
 
-    pub async fn verify_email(&self, token: String) -> Result<()> {
+    pub async fn verify_email(&self, token: String) -> Result<AuthResponse> {
         let user = self.db.find_record_by_field::<User>(
             "user",
             "verification_token",
             &token,
         ).await?
         .ok_or(AuthError::InvalidToken)?;
+
+        // 检查用户是否已经验证
+        if user.is_email_verified {
+            return Err(AuthError::InvalidToken);
+        }
 
         let mut updated_user = user.clone();
         updated_user.is_email_verified = true;
@@ -324,13 +390,14 @@ impl AuthService {
         // 保持原始 id
         updated_user.id = user.id.clone();
 
-        self.db.update_record(
+        let verified_user = self.db.update_record(
             "user",
             user.id.as_ref().unwrap(),
             &updated_user,
         ).await?;
 
-        Ok(())
+        // 验证成功后创建会话
+        self.create_session(verified_user).await
     }
 
     pub async fn get_user_by_id(&self, user_id: &str) -> Result<Option<User>> {
@@ -356,6 +423,121 @@ impl AuthService {
 
         // 更新用户记录
         self.db.update_record("user", &thing, &user).await
+    }
+
+    pub async fn request_password_reset(&self, email: String) -> Result<()> {
+        // 检查用户是否存在
+        let user = self.db.find_record_by_field::<User>(
+            "user",
+            "email",
+            &email,
+        ).await?;
+
+        if user.is_none() {
+            // 即使用户不存在，也要返回成功，以防止邮箱枚举攻击
+            return Ok(());
+        }
+
+        // 生成重置令牌
+        let reset_token = Uuid::new_v4().to_string();
+        let now = Utc::now();
+        let expires_at = now + Duration::hours(1); // 1小时后过期
+
+        let id = Thing {
+            tb: "password_reset_token".to_string(),
+            id: Uuid::new_v4().to_string().into(),
+        };
+
+        let token_record = PasswordResetToken {
+            id: Some(id),
+            email: email.clone(),
+            token: reset_token.clone(),
+            expires_at,
+            used: false,
+            created_at: now,
+        };
+
+        // 保存重置令牌
+        self.db.create_record("password_reset_token", &token_record).await?;
+
+        // 发送重置邮件
+        self.email_service.send_password_reset_email(&email, &reset_token).await?;
+
+        Ok(())
+    }
+
+    pub async fn reset_password(&self, token: String, new_password: String) -> Result<()> {
+        // 查找重置令牌
+        let reset_token = self.db.find_record_by_field::<PasswordResetToken>(
+            "password_reset_token",
+            "token",
+            &token,
+        ).await?
+        .ok_or(AuthError::InvalidToken)?;
+
+        // 检查令牌是否已使用
+        if reset_token.used {
+            return Err(AuthError::InvalidToken);
+        }
+
+        // 检查令牌是否过期
+        if reset_token.expires_at < Utc::now() {
+            return Err(AuthError::InvalidToken);
+        }
+
+        // 查找用户
+        let mut user = self.db.find_record_by_field::<User>(
+            "user",
+            "email",
+            &reset_token.email,
+        ).await?
+        .ok_or(AuthError::UserNotFound)?;
+
+        // 更新密码
+        user.password_hash = Some(hash_password(&new_password)?);
+        user.updated_at = Utc::now();
+
+        // 更新用户记录
+        let user_thing = user.id.as_ref().unwrap();
+        self.db.update_record("user", user_thing, &user).await?;
+
+        // 标记令牌为已使用
+        let mut updated_token = reset_token.clone();
+        updated_token.used = true;
+        let token_thing = reset_token.id.as_ref().unwrap();
+        self.db.update_record("password_reset_token", token_thing, &updated_token).await?;
+
+        Ok(())
+    }
+
+    pub async fn logout(&self, token: String) -> Result<()> {
+        // 删除会话记录
+        self.db.delete_session_by_token(&token).await?;
+        Ok(())
+    }
+
+    pub async fn logout_all_sessions(&self, user_id: &str) -> Result<()> {
+        // 删除用户的所有会话
+        self.db.delete_sessions_by_user_id(user_id).await?;
+        Ok(())
+    }
+
+    pub async fn get_user_sessions(&self, user_id: &str, current_token: &str) -> Result<Vec<SessionInfo>> {
+        let sessions = self.db.get_sessions_by_user_id(user_id).await?;
+        
+        let session_infos: Vec<SessionInfo> = sessions
+            .into_iter()
+            .map(|session| SessionInfo {
+                id: session.id.as_ref().unwrap().to_string(),
+                created_at: DateTime::<Utc>::from_timestamp(session.created_at, 0)
+                    .unwrap_or_else(|| Utc::now()),
+                user_agent: session.user_agent,
+                ip_address: session.ip_address,
+                is_current: session.token == current_token,
+            })
+            .collect();
+
+        Ok(session_infos)
     }
 }
 

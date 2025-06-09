@@ -6,6 +6,8 @@ pub struct Config {
     pub database_url: String,
     pub database_user: String,
     pub database_pass: String,
+    pub database_connection_timeout: u64,
+    pub database_max_connections: u32,
     pub jwt_secret: String,
     pub jwt_expiration: i64,
     pub google_client_id: String,
@@ -34,6 +36,14 @@ impl Config {
                 .unwrap_or_else(|_| "root".to_string()),
             database_pass: env::var("DATABASE_PASS")
                 .unwrap_or_else(|_| "root".to_string()),
+            database_connection_timeout: env::var("DATABASE_CONNECTION_TIMEOUT")
+                .unwrap_or_else(|_| "30".to_string())
+                .parse()
+                .unwrap_or(30),
+            database_max_connections: env::var("DATABASE_MAX_CONNECTIONS")
+                .unwrap_or_else(|_| "10".to_string())
+                .parse()
+                .unwrap_or(10),
             jwt_secret: env::var("JWT_SECRET")
                 .expect("JWT_SECRET must be set"),
             jwt_expiration: env::var("JWT_EXPIRATION")

@@ -36,16 +36,25 @@ impl Database {
     }
 
     async fn try_connect(config: &Config) -> Result<Self> {
-        debug!("Connecting to database at {}", config.database_url);
-        let client = Surreal::<Client>::new::<Http>(&config.database_url).await
-            .map_err(|e| AuthError::DatabaseError(format!("Failed to connect: {}", e)))?;
+        debug!("Connecting to database");
+        
+        // 设置连接超时
+        let client = tokio::time::timeout(
+            Duration::from_secs(config.database_connection_timeout),
+            Surreal::<Client>::new::<Http>(&config.database_url)
+        ).await
+        .map_err(|_| AuthError::DatabaseError("Database connection timeout".to_string()))?
+        .map_err(|e| AuthError::DatabaseError(format!("Failed to connect: {}", e)))?;
             
         debug!("Authenticating with database");
-        client.signin(Root {
-            username: &config.database_user,
-            password: &config.database_pass,
-        })
-        .await
+        tokio::time::timeout(
+            Duration::from_secs(config.database_connection_timeout),
+            client.signin(Root {
+                username: &config.database_user,
+                password: &config.database_pass,
+            })
+        ).await
+        .map_err(|_| AuthError::DatabaseError("Database authentication timeout".to_string()))?
         .map_err(|e| AuthError::DatabaseError(format!("Failed to authenticate: {}", e)))?;
         
         debug!("Selecting namespace and database");
@@ -118,6 +127,21 @@ impl Database {
                 DEFINE INDEX token_idx ON session COLUMNS token UNIQUE;
             "#;
             self.client.query(session).await?;
+        }
+
+        // 密码重置令牌表
+        if !table_exists(self, "password_reset_token").await? {
+            let password_reset_token = r#"
+                DEFINE TABLE password_reset_token SCHEMAFULL;
+                DEFINE FIELD email ON password_reset_token TYPE string;
+                DEFINE FIELD token ON password_reset_token TYPE string;
+                DEFINE FIELD expires_at ON password_reset_token TYPE datetime;
+                DEFINE FIELD used ON password_reset_token TYPE bool;
+                DEFINE FIELD created_at ON password_reset_token TYPE datetime;
+                DEFINE INDEX reset_token_idx ON password_reset_token COLUMNS token UNIQUE;
+                DEFINE INDEX reset_email_idx ON password_reset_token COLUMNS email;
+            "#;
+            self.client.query(password_reset_token).await?;
         }
 
         Ok(())
@@ -196,5 +220,40 @@ impl Database {
             .map_err(|_| AuthError::DatabaseError("Failed to delete record".into()))?;
             
         Ok(deleted)
+    }
+
+    pub async fn delete_session_by_token(&self, token: &str) -> Result<()> {
+        let query = "DELETE session WHERE token = $token";
+        self.client
+            .query(query)
+            .bind(("token", token))
+            .await
+            .map_err(|e| AuthError::DatabaseError(format!("Failed to delete session: {}", e)))?;
+        Ok(())
+    }
+
+    pub async fn delete_sessions_by_user_id(&self, user_id: &str) -> Result<()> {
+        let query = "DELETE session WHERE user_id = type::thing($user_id)";
+        self.client
+            .query(query)
+            .bind(("user_id", format!("user:{}", user_id)))
+            .await
+            .map_err(|e| AuthError::DatabaseError(format!("Failed to delete sessions: {}", e)))?;
+        Ok(())
+    }
+
+    pub async fn get_sessions_by_user_id(&self, user_id: &str) -> Result<Vec<crate::models::session::Session>> {
+        let query = "SELECT * FROM session WHERE user_id = type::thing($user_id) ORDER BY created_at DESC";
+        let mut result = self.client
+            .query(query)
+            .bind(("user_id", format!("user:{}", user_id)))
+            .await
+            .map_err(|e| AuthError::DatabaseError(format!("Failed to query sessions: {}", e)))?;
+        
+        let sessions = result
+            .take(0)
+            .map_err(|e| AuthError::DatabaseError(format!("Failed to parse sessions: {}", e)))?;
+            
+        Ok(sessions)
     }
 }

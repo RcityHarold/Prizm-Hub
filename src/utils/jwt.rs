@@ -14,6 +14,7 @@ pub struct Claims {
     pub sub: String,
     pub exp: i64,
     pub iat: i64,
+    pub session_id: Option<String>,
 }
 
 #[async_trait]
@@ -23,7 +24,7 @@ where
 {
     type Rejection = AuthError;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self> {
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self> {
         // 从请求头中提取 Bearer token
         let TypedHeader(Authorization(bearer)) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
@@ -31,13 +32,12 @@ where
             .map_err(|_| AuthError::InvalidToken)?;
 
         // 验证 JWT
+        let jwt_secret = std::env::var("JWT_SECRET")
+            .map_err(|_| AuthError::InvalidToken)?;
+        
         let token_data = decode::<Claims>(
             bearer.token(),
-            &DecodingKey::from_secret(
-                std::env::var("JWT_SECRET")
-                    .unwrap_or_else(|_| "your-super-secret-key".to_string())
-                    .as_bytes(),
-            ),
+            &DecodingKey::from_secret(jwt_secret.as_bytes()),
             &Validation::default(),
         )
         .map_err(|_| AuthError::InvalidToken)?;

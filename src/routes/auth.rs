@@ -2,11 +2,14 @@ use crate::{
     config::Config,
     error::{AuthError, Result},
     models::user::{CreateUserRequest, LoginRequest, AuthResponse, UserResponse, InitializePasswordRequest},
+    models::password_reset::{RequestPasswordResetRequest, ResetPasswordRequest},
+    models::session::{LogoutRequest, SessionInfo},
     services::auth::AuthService,
     utils::jwt::Claims,
 };
 use axum::{
-    extract::{Query, State},
+    extract::{Query, State, TypedHeader},
+    headers::{authorization::Bearer, Authorization},
     routing::{get, post},
     Json, Router,
     Extension,
@@ -15,7 +18,7 @@ use axum::{
 use serde::Deserialize;
 use std::sync::Arc;
 use crate::services::database::Database;
-use tracing::error;
+use tracing::{error, info};
 
 #[derive(Debug, Deserialize)]
 pub struct OAuthCallback {
@@ -30,6 +33,11 @@ pub fn router(db: Arc<Database>) -> Router {
         .route("/verify-email/:token", get(verify_email))
         .route("/me", get(get_current_user))
         .route("/initialize-password", post(initialize_password))
+        .route("/request-password-reset", post(request_password_reset))
+        .route("/reset-password", post(reset_password))
+        .route("/logout", post(logout))
+        .route("/logout-all", post(logout_all))
+        .route("/sessions", get(get_sessions))
         // OAuth 路由
         .route("/login/google", get(google_login))
         .route("/callback/google", get(google_callback))
@@ -43,14 +51,23 @@ async fn register(
     State(db): State<Arc<Database>>,
     Extension(config): Extension<Config>,
     Json(req): Json<CreateUserRequest>,
-) -> Result<Json<AuthResponse>> {
-    error!("Starting registration with email: {}", req.email);
+) -> Result<&'static str> {
+    tracing::info!("Starting user registration");
     let auth_service = AuthService::new(db, config)?;
     let result = auth_service.register(req).await;
-    if let Err(ref e) = result {
-        error!("Registration failed: {:?}", e);
+    match result {
+        Ok(auth_response) => {
+            if auth_response.token.is_empty() {
+                Ok("Registration successful. Please check your email to verify your account.")
+            } else {
+                Err(AuthError::ServerError("Unexpected response".to_string()))
+            }
+        },
+        Err(e) => {
+            error!("Registration failed: {:?}", e);
+            Err(e)
+        }
     }
-    result.map(Json)
 }
 
 // 登录处理函数
@@ -69,15 +86,17 @@ async fn verify_email(
     State(db): State<Arc<Database>>,
     Extension(config): Extension<Config>,
     axum::extract::Path(token): axum::extract::Path<String>,
-) -> Result<&'static str> {
-    error!("Starting email verification with token: {}", token);
+) -> Result<Json<AuthResponse>> {
+    tracing::info!("Starting email verification");
     let auth_service = AuthService::new(db, config)?;
     let result = auth_service.verify_email(token).await;
-    if let Err(ref e) = result {
-        error!("Email verification failed: {:?}", e);
+    match result {
+        Ok(auth_response) => Ok(Json(auth_response)),
+        Err(e) => {
+            error!("Email verification failed: {:?}", e);
+            Err(e)
+        }
     }
-    result?;
-    Ok("Email verified successfully")
 }
 
 // 获取当前用户信息
@@ -111,7 +130,7 @@ async fn google_callback(
     Extension(config): Extension<Config>,
     Query(params): Query<OAuthCallback>,
 ) -> Result<axum::response::Response> {
-    error!("Starting Google callback with code: {}", params.code);
+    tracing::info!("Starting Google OAuth callback");
     let auth_service = AuthService::new(db, config)?;
     let auth_response = match auth_service.handle_google_callback(params.code).await {
         Ok(response) => response,
@@ -130,7 +149,7 @@ async fn google_callback(
         format!("http://localhost:3000?token={}", auth_response.token)
     };
 
-    error!("Redirecting to: {}", redirect_url);
+    tracing::info!("OAuth callback completed, redirecting user");
     Ok(axum::response::Redirect::to(&redirect_url).into_response())
 }
 
@@ -175,6 +194,63 @@ async fn initialize_password(
     let auth_service = AuthService::new(db, config)?;
     let user = auth_service.initialize_password(&claims.sub, &request.password).await?;
     Ok(Json(user.into()))
+}
+
+// 请求密码重置处理函数
+async fn request_password_reset(
+    State(db): State<Arc<Database>>,
+    Extension(config): Extension<Config>,
+    Json(request): Json<RequestPasswordResetRequest>,
+) -> Result<&'static str> {
+    let auth_service = AuthService::new(db, config)?;
+    auth_service.request_password_reset(request.email).await?;
+    Ok("Password reset email sent if account exists")
+}
+
+// 重置密码处理函数
+async fn reset_password(
+    State(db): State<Arc<Database>>,
+    Extension(config): Extension<Config>,
+    Json(request): Json<ResetPasswordRequest>,
+) -> Result<&'static str> {
+    let auth_service = AuthService::new(db, config)?;
+    auth_service.reset_password(request.token, request.new_password).await?;
+    Ok("Password reset successfully")
+}
+
+// 登出处理函数
+async fn logout(
+    State(db): State<Arc<Database>>,
+    Extension(config): Extension<Config>,
+    TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
+    claims: Claims,
+) -> Result<&'static str> {
+    let auth_service = AuthService::new(db, config)?;
+    auth_service.logout(bearer.token().to_string()).await?;
+    Ok("Logged out successfully")
+}
+
+// 登出所有会话处理函数
+async fn logout_all(
+    State(db): State<Arc<Database>>,
+    Extension(config): Extension<Config>,
+    claims: Claims,
+) -> Result<&'static str> {
+    let auth_service = AuthService::new(db, config)?;
+    auth_service.logout_all_sessions(&claims.sub).await?;
+    Ok("All sessions logged out successfully")
+}
+
+// 获取用户会话列表处理函数
+async fn get_sessions(
+    State(db): State<Arc<Database>>,
+    Extension(config): Extension<Config>,
+    TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
+    claims: Claims,
+) -> Result<Json<Vec<SessionInfo>>> {
+    let auth_service = AuthService::new(db, config)?;
+    let sessions = auth_service.get_user_sessions(&claims.sub, bearer.token()).await?;
+    Ok(Json(sessions))
 }
 
 // 错误处理中间件
