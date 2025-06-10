@@ -3,7 +3,7 @@ use std::time::Duration;
 use surrealdb::engine::remote::http::{Client, Http};
 use surrealdb::opt::auth::Root;
 use surrealdb::sql::Thing;
-use surrealdb::Surreal;
+use surrealdb::{Surreal, Response};
 use tokio::time::sleep;
 use tracing::{debug, warn};
 
@@ -255,5 +255,10 @@ impl Database {
             .map_err(|e| AuthError::DatabaseError(format!("Failed to parse sessions: {}", e)))?;
             
         Ok(sessions)
+    }
+
+    /// 公开的查询方法，供其他服务使用  
+    pub fn query(&self, sql: &str) -> surrealdb::method::Query<'_, Client> {
+        self.client.query(sql)
     }
 }

@@ -63,3 +63,6 @@ impl From<SurrealDBError> for AuthError {
 }
 
 pub type Result<T> = std::result::Result<T, AuthError>;
+
+// 为了兼容，添加 AppError 别名
+pub type AppError = AuthError;

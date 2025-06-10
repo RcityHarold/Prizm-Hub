@@ -8,22 +8,45 @@ use crate::{
     utils::jwt::Claims,
 };
 use axum::{
-    extract::{Query, State, TypedHeader},
+    extract::{Query, State, TypedHeader, ConnectInfo},
     headers::{authorization::Bearer, Authorization},
     routing::{get, post},
     Json, Router,
     Extension,
     response::IntoResponse,
+    http::{HeaderMap, StatusCode},
 };
 use serde::Deserialize;
-use std::sync::Arc;
-use crate::services::database::Database;
+use std::{sync::Arc, net::SocketAddr};
+use crate::{services::database::Database, utils::rate_limit_middleware::check_rate_limit_for_request, AppState};
 use tracing::{error, info};
+use serde_json::json;
 
 #[derive(Debug, Deserialize)]
 pub struct OAuthCallback {
     code: String,
     state: Option<String>,
+}
+
+/// 获取客户端IP地址的辅助函数
+fn get_client_ip(addr: &SocketAddr, headers: &HeaderMap) -> String {
+    // 尝试从头部获取真实IP
+    if let Some(forwarded_for) = headers.get("X-Forwarded-For") {
+        if let Ok(forwarded_str) = forwarded_for.to_str() {
+            if let Some(ip) = forwarded_str.split(',').next() {
+                return ip.trim().to_string();
+            }
+        }
+    }
+
+    if let Some(real_ip) = headers.get("X-Real-IP") {
+        if let Ok(ip_str) = real_ip.to_str() {
+            return ip_str.to_string();
+        }
+    }
+
+    // 回退到连接地址
+    addr.ip().to_string()
 }
 
 pub fn router(db: Arc<Database>) -> Router {
@@ -50,23 +73,48 @@ pub fn router(db: Arc<Database>) -> Router {
 async fn register(
     State(db): State<Arc<Database>>,
     Extension(config): Extension<Config>,
+    Extension(app_state): Extension<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(req): Json<CreateUserRequest>,
-) -> Result<&'static str> {
+) -> std::result::Result<&'static str, (StatusCode, Json<serde_json::Value>)> {
     tracing::info!("Starting user registration");
-    let auth_service = AuthService::new(db, config)?;
-    let result = auth_service.register(req).await;
-    match result {
-        Ok(auth_response) => {
-            if auth_response.token.is_empty() {
-                Ok("Registration successful. Please check your email to verify your account.")
-            } else {
-                Err(AuthError::ServerError("Unexpected response".to_string()))
-            }
-        },
-        Err(e) => {
-            error!("Registration failed: {:?}", e);
-            Err(e)
-        }
+    
+    // 获取客户端IP
+    let client_ip = get_client_ip(&addr, &headers);
+    
+    // 检查速率限制
+    check_rate_limit_for_request(&app_state.rate_limiter, &client_ip, "/api/auth/register").await?;
+    
+    let auth_service = AuthService::new(db, config).map_err(|e| {
+        error!("Failed to create auth service: {:?}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
+            "error": "Internal server error",
+            "message": "Service unavailable"
+        })))
+    })?;
+    
+    let result = auth_service.register(req).await.map_err(|e| {
+        error!("Registration failed: {:?}", e);
+        let (status, message) = match e {
+            AuthError::EmailExists => (StatusCode::CONFLICT, "Email already registered"),
+            AuthError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error"),
+            _ => (StatusCode::INTERNAL_SERVER_ERROR, "Registration failed"),
+        };
+        
+        (status, Json(json!({
+            "error": "Registration failed",
+            "message": message
+        })))
+    })?;
+    
+    if result.token.is_empty() {
+        Ok("Registration successful. Please check your email to verify your account.")
+    } else {
+        Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
+            "error": "Unexpected response",
+            "message": "Invalid server response"
+        }))))
     }
 }
 
@@ -74,10 +122,113 @@ async fn register(
 async fn login(
     State(db): State<Arc<Database>>,
     Extension(config): Extension<Config>,
+    Extension(app_state): Extension<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(req): Json<LoginRequest>,
-) -> Result<Json<AuthResponse>> {
-    let auth_service = AuthService::new(db, config)?;
-    let response = auth_service.login(req.email, req.password).await?;
+) -> std::result::Result<Json<AuthResponse>, (StatusCode, Json<serde_json::Value>)> {
+    // 获取客户端IP
+    let client_ip = get_client_ip(&addr, &headers);
+    
+    // 检查速率限制
+    check_rate_limit_for_request(&app_state.rate_limiter, &client_ip, "/api/auth/login").await?;
+    
+    // 检查IP地址锁定
+    let ip_lockout_result = app_state.lockout_service.check_ip_lockout(&client_ip).await.map_err(|e| {
+        error!("Failed to check IP lockout: {:?}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
+            "error": "Internal server error",
+            "message": "Service unavailable"
+        })))
+    })?;
+    
+    if ip_lockout_result.is_locked {
+        return Err((StatusCode::TOO_MANY_REQUESTS, Json(json!({
+            "error": "Account locked",
+            "message": ip_lockout_result.message,
+            "locked_until_seconds": ip_lockout_result.remaining_lockout_seconds
+        }))));
+    }
+    
+    // 检查用户账户锁定（如果我们能找到用户）
+    // 注意：为了防止用户枚举攻击，我们需要小心处理这个检查
+    let user_lockout_result = app_state.lockout_service.check_user_lockout(&req.email).await.map_err(|e| {
+        error!("Failed to check user lockout: {:?}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
+            "error": "Internal server error",
+            "message": "Service unavailable"
+        })))
+    })?;
+    
+    if user_lockout_result.is_locked {
+        return Err((StatusCode::TOO_MANY_REQUESTS, Json(json!({
+            "error": "Account locked",
+            "message": user_lockout_result.message,
+            "locked_until_seconds": user_lockout_result.remaining_lockout_seconds
+        }))));
+    }
+    
+    // 执行登录逻辑
+    let auth_service = AuthService::new(db, config).map_err(|e| {
+        error!("Failed to create auth service: {:?}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
+            "error": "Internal server error",
+            "message": "Service unavailable"
+        })))
+    })?;
+    
+    let response = auth_service.login(req.email.clone(), req.password).await.map_err(|e| {
+        error!("Login failed: {:?}", e);
+        
+        // 在认证失败时记录锁定尝试
+        let should_record_failure = matches!(e, 
+            AuthError::InvalidCredentials | 
+            AuthError::UserNotFound
+        );
+        
+        if should_record_failure {
+            // 异步记录失败尝试，不等待结果以避免阻塞响应
+            let lockout_service = app_state.lockout_service.clone();
+            let email = req.email.clone();
+            let ip = client_ip.clone();
+            
+            tokio::spawn(async move {
+                if let Err(e) = lockout_service.record_failed_user_attempt(&email).await {
+                    error!("Failed to record user lockout attempt: {:?}", e);
+                }
+                if let Err(e) = lockout_service.record_failed_ip_attempt(&ip).await {
+                    error!("Failed to record IP lockout attempt: {:?}", e);
+                }
+            });
+        }
+        
+        let (status, message) = match e {
+            AuthError::InvalidCredentials => (StatusCode::UNAUTHORIZED, "Invalid email or password"),
+            AuthError::EmailNotVerified => (StatusCode::FORBIDDEN, "Email not verified"),
+            AuthError::UserNotFound => (StatusCode::UNAUTHORIZED, "Invalid email or password"),
+            _ => (StatusCode::INTERNAL_SERVER_ERROR, "Login failed"),
+        };
+        
+        (status, Json(json!({
+            "error": "Authentication failed",
+            "message": message
+        })))
+    })?;
+    
+    // 登录成功，重置失败尝试计数
+    let lockout_service = app_state.lockout_service.clone();
+    let email = req.email.clone();
+    let ip = client_ip.clone();
+    
+    tokio::spawn(async move {
+        if let Err(e) = lockout_service.reset_user_attempts(&email).await {
+            error!("Failed to reset user attempts: {:?}", e);
+        }
+        if let Err(e) = lockout_service.reset_ip_attempts(&ip).await {
+            error!("Failed to reset IP attempts: {:?}", e);
+        }
+    });
+    
     Ok(Json(response))
 }
 
