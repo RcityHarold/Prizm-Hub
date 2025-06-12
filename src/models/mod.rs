@@ -4,3 +4,6 @@ pub mod identity_provider;
 pub mod password_reset;
 pub mod mfa;
 pub mod account_lockout;
+pub mod role;
+pub mod permission;
+pub mod user_role;

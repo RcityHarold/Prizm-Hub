@@ -21,6 +21,7 @@ use crate::{
         database::Database, 
         rate_limiter::{RateLimiter, RateLimitRules},
         account_lockout::AccountLockoutService,
+        rbac::RBACService,
     },
 };
 
@@ -49,6 +50,10 @@ async fn main() -> anyhow::Result<()> {
     // 初始化数据库
     let db = Database::new(&config).await?;
     db.initialize_schema().await?;
+
+    // 初始化RBAC系统
+    let rbac_service = RBACService::new(Arc::new(db.clone()));
+    rbac_service.initialize_system_roles_and_permissions().await?;
 
     // 创建共享的数据库实例
     let shared_db = Arc::new(db.clone());
@@ -88,7 +93,9 @@ async fn main() -> anyhow::Result<()> {
 
     // 创建路由
     let app = Router::new()
-        .nest("/api/auth", routes::auth::router(shared_db))
+        .nest("/api/auth", routes::auth::router(shared_db.clone()))
+        .nest("/api/rbac", routes::rbac::router())
+        .layer(Extension(shared_db))
         .layer(Extension(Arc::new(app_state)))
         .layer(Extension(config.clone()))  // 添加 Config 扩展
         .layer(

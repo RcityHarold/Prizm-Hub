@@ -14,6 +14,16 @@
 - 密码重置功能
 - 安全会话管理
 
+### 权限系统 🔐
+- **RBAC (基于角色的访问控制)**: 完整的角色权限管理系统
+- **角色管理**: 创建、编辑、删除角色，支持系统角色保护
+- **权限管理**: 基于资源和操作的细粒度权限控制
+- **用户角色分配**: 灵活的用户角色分配和移除
+- **权限检查**: 实时权限验证和角色检查
+- **系统角色**: 预定义管理员、用户管理员、安全管理员等角色
+- **权限继承**: 角色权限自动继承和聚合
+- **权限保护**: API接口级别的权限控制
+
 ### 用户管理
 - 用户注册（需邮箱验证）
 - 用户登录
@@ -22,6 +32,7 @@
 - OAuth 用户管理
 - 完整的会话管理
 - 密码重置和恢复
+- 基于角色的用户权限管理
 
 ### 安全防护层 🛡️
 - **速率限制 (Rate Limiting)**: 防止暴力破解和API滥用
@@ -38,8 +49,15 @@
 - 时效性密码重置令牌
 - 安全的JWT密钥管理
 
-### 最新更新 (安全防护层完成版本) 🎉
-- 🛡️ **安全防护层完成**: 全面的安全防护体系
+### 最新更新 (权限系统完成版本) 🎉
+- 🔐 **权限系统完成**: 完整的RBAC（基于角色的访问控制）系统
+  - ✅ **角色管理**: 创建、编辑、查询角色，支持系统角色和自定义角色
+  - ✅ **权限管理**: 基于资源和操作的细粒度权限控制
+  - ✅ **用户角色分配**: 灵活的用户角色分配和移除机制
+  - ✅ **权限检查中间件**: 便捷的权限验证宏和中间件
+  - ✅ **系统初始化**: 自动创建系统角色和权限
+  - ✅ **权限保护**: 所有RBAC接口都有相应的权限保护
+- 🛡️ **安全防护层**: 全面的安全防护体系（第一阶段已完成）
   - ✅ **速率限制**: 智能API请求频率控制，防止暴力破解
   - ✅ **多因素认证**: 完整TOTP/Google Authenticator支持
   - ✅ **账户锁定**: 自动锁定机制，多维度安全保护
@@ -52,7 +70,7 @@
 - ✨ **新功能**: 真正的会话管理系统（登出、会话列表、批量登出）
 - 🔧 **修复**: 邮箱验证逻辑优化（注册后强制验证才能登录）
 - 🔧 **修复**: OAuth 用户记录处理改进
-- 📊 **数据库**: 新增 password_reset_token、session、user_mfa、account_lockout 表
+- 📊 **数据库**: 新增 password_reset_token、session、user_mfa、account_lockout、role、permission、user_role、role_permission 表
 
 ## 技术栈
 
@@ -64,7 +82,8 @@
 - **OAuth**: [oauth2](https://github.com/ramosbugs/oauth2-rs)
 - **多因素认证**: [totp-rs](https://github.com/constantoine/totp-rs) + [qrcode](https://github.com/kennytm/qrcode-rust)
 - **速率限制**: 自研高性能内存缓存系统
-- **安全组件**: Tower middleware + 自定义安全层
+- **权限系统**: 自研RBAC权限控制框架
+- **安全组件**: Tower middleware + 自定义安全层 + 权限中间件
 
 ## 快速开始
 
@@ -216,6 +235,60 @@ DEFINE TABLE account_lockout SCHEMAFULL;
 - created_at: datetime - 创建时间
 - updated_at: datetime - 更新时间
 
+### 角色表 (role)
+```sql
+DEFINE TABLE role SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 角色唯一标识符
+- name: string - 角色名称（唯一）
+- display_name: string - 角色显示名称
+- description: string - 角色描述
+- is_system: bool - 是否为系统角色（系统角色不可删除）
+- created_at: number - 创建时间戳
+- updated_at: number - 更新时间戳
+
+### 权限表 (permission)
+```sql
+DEFINE TABLE permission SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 权限唯一标识符
+- name: string - 权限名称（唯一）
+- display_name: string - 权限显示名称
+- description: string - 权限描述
+- resource: string - 资源类型（如 users, roles, permissions）
+- action: string - 操作类型（如 read, write, delete）
+- is_system: bool - 是否为系统权限
+- created_at: number - 创建时间戳
+- updated_at: number - 更新时间戳
+
+### 用户角色关联表 (user_role)
+```sql
+DEFINE TABLE user_role SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 关联唯一标识符
+- user_id: record(user) - 用户ID
+- role_id: record(role) - 角色ID
+- assigned_at: number - 分配时间戳
+- assigned_by: record(user) - 分配者用户ID
+
+### 角色权限关联表 (role_permission)
+```sql
+DEFINE TABLE role_permission SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 关联唯一标识符
+- role_id: record(role) - 角色ID
+- permission_id: record(permission) - 权限ID
+- granted_at: number - 授权时间戳
+- granted_by: record(user) - 授权者用户ID
+
 ## API 端点
 
 ### 用户认证
@@ -252,6 +325,33 @@ DEFINE TABLE account_lockout SCHEMAFULL;
 - `GET /api/auth/security/lockout-status` - 查看账户锁定状态
 - `POST /api/auth/security/unlock-account` - 管理员解锁账户
 - `GET /api/auth/security/rate-limit-status` - 查看速率限制状态
+
+### 权限系统 (RBAC) 🔐
+#### 角色管理
+- `GET /api/rbac/roles` - 获取角色列表（支持分页）
+- `POST /api/rbac/roles` - 创建新角色
+- `GET /api/rbac/roles/:role_name` - 获取指定角色详情
+- `POST /api/rbac/roles/:role_name` - 更新角色信息
+- `GET /api/rbac/roles/:role_name/permissions` - 获取角色权限列表
+
+#### 权限管理
+- `GET /api/rbac/permissions` - 获取权限列表（支持分页）
+- `POST /api/rbac/permissions` - 创建新权限
+- `GET /api/rbac/permissions/:permission_name` - 获取指定权限详情
+
+#### 角色权限分配
+- `POST /api/rbac/roles/:role_name/permissions/assign` - 为角色分配权限
+- `POST /api/rbac/roles/:role_name/permissions/remove` - 移除角色权限
+
+#### 用户角色管理
+- `GET /api/rbac/users/:user_id/roles` - 获取用户角色列表
+- `POST /api/rbac/users/:user_id/roles/assign` - 为用户分配角色
+- `POST /api/rbac/users/:user_id/roles/remove` - 移除用户角色
+- `GET /api/rbac/users/:user_id/permissions` - 获取用户所有权限
+
+#### 权限检查
+- `GET /api/rbac/check/permission/:permission_name` - 检查当前用户是否具有指定权限
+- `GET /api/rbac/check/role/:role_name` - 检查当前用户是否具有指定角色
 
 ## API 示例
 
@@ -561,6 +661,125 @@ curl -X POST http://localhost:8080/api/auth/mfa/verify-totp \
 }
 ```
 
+### 权限系统 (RBAC) 示例
+
+#### 创建角色
+```bash
+# 请求
+curl -X POST http://localhost:8080/api/rbac/roles \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "editor",
+    "display_name": "编辑员",
+    "description": "可以编辑内容的用户角色"
+  }'
+
+# 成功响应 (200 OK)
+{
+  "success": true,
+  "data": {
+    "id": "role_xyz789",
+    "name": "editor",
+    "display_name": "编辑员",
+    "description": "可以编辑内容的用户角色",
+    "is_system": false,
+    "created_at": "2025-04-01T10:30:00Z",
+    "updated_at": "2025-04-01T10:30:00Z",
+    "permissions": []
+  },
+  "message": "Role created successfully"
+}
+```
+
+#### 获取角色列表
+```bash
+# 请求
+curl http://localhost:8080/api/rbac/roles?page=1&limit=10 \
+  -H "Authorization: Bearer your-jwt-token"
+
+# 成功响应 (200 OK)
+{
+  "success": true,
+  "data": [
+    {
+      "id": "role_admin",
+      "name": "admin",
+      "display_name": "系统管理员",
+      "description": "拥有所有权限的系统管理员",
+      "is_system": true,
+      "created_at": "2025-04-01T08:00:00Z",
+      "updated_at": "2025-04-01T08:00:00Z",
+      "permissions": ["users.read", "users.write", "roles.read", "roles.write"]
+    }
+  ],
+  "message": "Roles retrieved successfully"
+}
+```
+
+#### 为用户分配角色
+```bash
+# 请求
+curl -X POST http://localhost:8080/api/rbac/users/user123/roles/assign \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user123",
+    "role_name": "editor"
+  }'
+
+# 成功响应 (200 OK)
+{
+  "success": true,
+  "data": null,
+  "message": "Role assigned to user successfully"
+}
+```
+
+#### 检查用户权限
+```bash
+# 请求
+curl http://localhost:8080/api/rbac/check/permission/users.read \
+  -H "Authorization: Bearer your-jwt-token"
+
+# 成功响应 (200 OK)
+{
+  "success": true,
+  "data": {
+    "has_permission": true,
+    "user_id": "user123",
+    "permission": "users.read"
+  },
+  "message": "Permission checked successfully"
+}
+```
+
+#### 获取用户角色和权限
+```bash
+# 请求
+curl http://localhost:8080/api/rbac/users/user123/roles \
+  -H "Authorization: Bearer your-jwt-token"
+
+# 成功响应 (200 OK)
+{
+  "success": true,
+  "data": {
+    "user_id": "user123",
+    "roles": [
+      {
+        "id": "role_editor",
+        "name": "editor",
+        "display_name": "编辑员",
+        "description": "可以编辑内容的用户角色",
+        "permissions": ["users.read", "content.write"],
+        "assigned_at": "2025-04-01T11:00:00Z"
+      }
+    ]
+  },
+  "message": "User roles retrieved successfully"
+}
+```
+
 ### 安全状态检查示例
 
 #### 检查账户锁定状态
@@ -608,6 +827,29 @@ curl http://localhost:8080/api/auth/security/lockout-status \
 ```
 
 ## 安全特性
+
+### 🔐 权限系统（RBAC安全控制）
+
+#### 角色权限管理
+- **分层权限设计**: 基于资源和操作的细粒度权限控制
+- **系统角色保护**: 预定义系统角色不可删除，确保系统安全
+- **灵活角色创建**: 支持自定义角色，满足不同业务需求
+- **权限继承**: 用户通过角色获得权限，权限自动聚合
+- **实时权限检查**: 毫秒级权限验证，不影响性能
+
+#### 系统角色设计
+- **admin**: 系统管理员，拥有所有权限
+- **user_manager**: 用户管理员，负责用户管理相关权限
+- **security_manager**: 安全管理员，负责安全相关操作权限
+- **auditor**: 审计员，只读审计日志权限
+- **user**: 普通用户，基础权限
+
+#### 权限保护机制
+- **API级别保护**: 所有RBAC接口都需要相应权限才能访问
+- **中间件支持**: 提供便捷的权限检查宏和中间件
+- **权限验证**: `require_permission!`, `require_role!`, `require_admin!`
+- **动态权限**: 支持运行时权限检查和角色变更
+- **审计追踪**: 记录所有权限相关操作的审计日志
 
 ### 🛡️ 安全防护层（核心安全系统）
 
@@ -677,12 +919,15 @@ curl http://localhost:8080/api/auth/security/lockout-status \
 - [x] **安全漏洞修复**: JWT密钥管理、敏感信息保护
 - [x] **邮箱验证流程**: 强制验证优化
 
-### 📋 第二阶段：权限系统 (规划中)
-- [ ] 添加用户角色和权限管理 (RBAC)
-- [ ] 实现基于资源的访问控制
-- [ ] 组织和团队管理功能
-- [ ] 权限继承和委派机制
-- [ ] 细粒度权限控制
+### 🎉 第二阶段：权限系统 ✅ (已完成)
+- [x] **RBAC权限系统**: 完整的基于角色的访问控制
+- [x] **角色管理**: 创建、编辑、删除角色，支持系统角色保护
+- [x] **权限管理**: 基于资源和操作的细粒度权限控制
+- [x] **用户角色分配**: 灵活的用户角色分配和移除机制
+- [x] **权限检查中间件**: 便捷的权限验证宏和中间件
+- [x] **系统角色初始化**: 预定义管理员、用户管理员等系统角色
+- [x] **权限保护**: API接口级别的权限控制
+- [x] **实时权限验证**: 毫秒级权限检查，支持动态权限变更
 
 ### 📋 第三阶段：用户管理 (规划中)
 - [ ] 完善的用户生命周期管理

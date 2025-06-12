@@ -36,6 +36,18 @@ pub enum AuthError {
     
     #[error("Invalid user ID")]
     InvalidUserId,
+    
+    #[error("Not found: {0}")]
+    NotFound(String),
+    
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+    
+    #[error("Permission denied")]
+    PermissionDenied,
+    
+    #[error("Insufficient permissions")]
+    InsufficientPermissions,
 }
 
 impl From<reqwest::Error> for AuthError {

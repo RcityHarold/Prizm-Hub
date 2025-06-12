@@ -407,50 +407,66 @@ async fn get_sessions(
 // 错误处理中间件
 impl axum::response::IntoResponse for AuthError {
     fn into_response(self) -> axum::response::Response {
-        let (status, message) = match self {
+        let (status, message) = match &self {
             AuthError::DatabaseError(_) => (
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error",
+                "Internal server error".to_string(),
             ),
             AuthError::InvalidCredentials => (
                 axum::http::StatusCode::UNAUTHORIZED,
-                "Invalid credentials",
+                "Invalid credentials".to_string(),
             ),
             AuthError::EmailNotVerified => (
                 axum::http::StatusCode::FORBIDDEN,
-                "Email not verified",
+                "Email not verified".to_string(),
             ),
             AuthError::TokenError(_) => (
                 axum::http::StatusCode::UNAUTHORIZED,
-                "Invalid token",
+                "Invalid token".to_string(),
             ),
             AuthError::UserNotFound => (
                 axum::http::StatusCode::NOT_FOUND,
-                "User not found",
+                "User not found".to_string(),
             ),
             AuthError::EmailExists => (
                 axum::http::StatusCode::CONFLICT,
-                "Email already exists",
+                "Email already exists".to_string(),
             ),
             AuthError::InvalidToken => (
                 axum::http::StatusCode::UNAUTHORIZED,
-                "Invalid token",
+                "Invalid token".to_string(),
             ),
             AuthError::ServerError(_) => (
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error",
+                "Internal server error".to_string(),
             ),
             AuthError::OAuthError(_) => (
                 axum::http::StatusCode::BAD_REQUEST,
-                "OAuth error",
+                "OAuth error".to_string(),
             ),
             AuthError::PasswordAlreadySet => (
                 axum::http::StatusCode::CONFLICT,
-                "Password already set",
+                "Password already set".to_string(),
             ),
             AuthError::InvalidUserId => (
                 axum::http::StatusCode::BAD_REQUEST,
-                "Invalid user ID",
+                "Invalid user ID".to_string(),
+            ),
+            AuthError::NotFound(msg) => (
+                axum::http::StatusCode::NOT_FOUND,
+                msg.clone(),
+            ),
+            AuthError::ValidationError(msg) => (
+                axum::http::StatusCode::BAD_REQUEST,
+                msg.clone(),
+            ),
+            AuthError::PermissionDenied => (
+                axum::http::StatusCode::FORBIDDEN,
+                "Permission denied".to_string(),
+            ),
+            AuthError::InsufficientPermissions => (
+                axum::http::StatusCode::FORBIDDEN,
+                "Insufficient permissions".to_string(),
             ),
         };
 

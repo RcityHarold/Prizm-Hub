@@ -11,7 +11,7 @@ use crate::{config::Config, error::{Result, AuthError}};
 
 #[derive(Clone)]
 pub struct Database {
-    client: Surreal<Client>,
+    pub client: Surreal<Client>,
 }
 
 impl Database {
@@ -142,6 +142,104 @@ impl Database {
                 DEFINE INDEX reset_email_idx ON password_reset_token COLUMNS email;
             "#;
             self.client.query(password_reset_token).await?;
+        }
+
+        // 多因素认证表
+        if !table_exists(self, "user_mfa").await? {
+            let user_mfa = r#"
+                DEFINE TABLE user_mfa SCHEMAFULL;
+                DEFINE FIELD user_id ON user_mfa TYPE string;
+                DEFINE FIELD status ON user_mfa TYPE string;
+                DEFINE FIELD method ON user_mfa TYPE string;
+                DEFINE FIELD totp_secret ON user_mfa TYPE string;
+                DEFINE FIELD backup_codes ON user_mfa TYPE array;
+                DEFINE FIELD created_at ON user_mfa TYPE datetime;
+                DEFINE FIELD updated_at ON user_mfa TYPE datetime;
+                DEFINE FIELD last_used_at ON user_mfa TYPE option<datetime>;
+                DEFINE INDEX user_mfa_user_idx ON user_mfa COLUMNS user_id UNIQUE;
+            "#;
+            self.client.query(user_mfa).await?;
+        }
+
+        // 账户锁定表
+        if !table_exists(self, "account_lockout").await? {
+            let account_lockout = r#"
+                DEFINE TABLE account_lockout SCHEMAFULL;
+                DEFINE FIELD identifier ON account_lockout TYPE string;
+                DEFINE FIELD lockout_type ON account_lockout TYPE string;
+                DEFINE FIELD failed_attempts ON account_lockout TYPE number;
+                DEFINE FIELD status ON account_lockout TYPE string;
+                DEFINE FIELD locked_at ON account_lockout TYPE option<datetime>;
+                DEFINE FIELD locked_until ON account_lockout TYPE option<datetime>;
+                DEFINE FIELD last_attempt_at ON account_lockout TYPE option<datetime>;
+                DEFINE FIELD created_at ON account_lockout TYPE datetime;
+                DEFINE FIELD updated_at ON account_lockout TYPE datetime;
+                DEFINE INDEX lockout_identifier_idx ON account_lockout COLUMNS identifier, lockout_type UNIQUE;
+            "#;
+            self.client.query(account_lockout).await?;
+        }
+
+        // 角色表
+        if !table_exists(self, "role").await? {
+            let role = r#"
+                DEFINE TABLE role SCHEMAFULL;
+                DEFINE FIELD name ON role TYPE string;
+                DEFINE FIELD display_name ON role TYPE string;
+                DEFINE FIELD description ON role TYPE option<string>;
+                DEFINE FIELD is_system ON role TYPE bool;
+                DEFINE FIELD created_at ON role TYPE number;
+                DEFINE FIELD updated_at ON role TYPE number;
+                DEFINE INDEX role_name_idx ON role COLUMNS name UNIQUE;
+            "#;
+            self.client.query(role).await?;
+        }
+
+        // 权限表
+        if !table_exists(self, "permission").await? {
+            let permission = r#"
+                DEFINE TABLE permission SCHEMAFULL;
+                DEFINE FIELD name ON permission TYPE string;
+                DEFINE FIELD display_name ON permission TYPE string;
+                DEFINE FIELD description ON permission TYPE option<string>;
+                DEFINE FIELD resource ON permission TYPE string;
+                DEFINE FIELD action ON permission TYPE string;
+                DEFINE FIELD is_system ON permission TYPE bool;
+                DEFINE FIELD created_at ON permission TYPE number;
+                DEFINE FIELD updated_at ON permission TYPE number;
+                DEFINE INDEX permission_name_idx ON permission COLUMNS name UNIQUE;
+                DEFINE INDEX permission_resource_action_idx ON permission COLUMNS resource, action;
+            "#;
+            self.client.query(permission).await?;
+        }
+
+        // 用户角色关联表
+        if !table_exists(self, "user_role").await? {
+            let user_role = r#"
+                DEFINE TABLE user_role SCHEMAFULL;
+                DEFINE FIELD user_id ON user_role TYPE record(user);
+                DEFINE FIELD role_id ON user_role TYPE record(role);
+                DEFINE FIELD assigned_at ON user_role TYPE number;
+                DEFINE FIELD assigned_by ON user_role TYPE record(user);
+                DEFINE INDEX user_role_unique_idx ON user_role COLUMNS user_id, role_id UNIQUE;
+                DEFINE INDEX user_role_user_idx ON user_role COLUMNS user_id;
+                DEFINE INDEX user_role_role_idx ON user_role COLUMNS role_id;
+            "#;
+            self.client.query(user_role).await?;
+        }
+
+        // 角色权限关联表
+        if !table_exists(self, "role_permission").await? {
+            let role_permission = r#"
+                DEFINE TABLE role_permission SCHEMAFULL;
+                DEFINE FIELD role_id ON role_permission TYPE record(role);
+                DEFINE FIELD permission_id ON role_permission TYPE record(permission);
+                DEFINE FIELD granted_at ON role_permission TYPE number;
+                DEFINE FIELD granted_by ON role_permission TYPE record(user);
+                DEFINE INDEX role_permission_unique_idx ON role_permission COLUMNS role_id, permission_id UNIQUE;
+                DEFINE INDEX role_permission_role_idx ON role_permission COLUMNS role_id;
+                DEFINE INDEX role_permission_permission_idx ON role_permission COLUMNS permission_id;
+            "#;
+            self.client.query(role_permission).await?;
         }
 
         Ok(())
