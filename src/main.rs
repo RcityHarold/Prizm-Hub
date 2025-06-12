@@ -21,7 +21,6 @@ use crate::{
         database::Database, 
         rate_limiter::{RateLimiter, RateLimitRules},
         account_lockout::AccountLockoutService,
-        rbac::RBACService,
     },
 };
 
@@ -47,13 +46,11 @@ async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
     let config = Config::from_env()?;
 
-    // 初始化数据库
+    // 初始化数据库连接
     let db = Database::new(&config).await?;
-    db.initialize_schema().await?;
-
-    // 初始化RBAC系统
-    let rbac_service = RBACService::new(Arc::new(db.clone()));
-    rbac_service.initialize_system_roles_and_permissions().await?;
+    db.verify_connection().await?;
+    
+    info!("Database connection established. Please ensure database schema is initialized with schema.sql and initial_data.sql");
 
     // 创建共享的数据库实例
     let shared_db = Arc::new(db.clone());
