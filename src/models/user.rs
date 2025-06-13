@@ -15,6 +15,18 @@ pub struct User {
     #[serde(rename = "verified")]
     pub is_email_verified: bool,
     pub verification_token: Option<String>,
+    pub account_status: AccountStatus,
+    pub last_login_at: Option<DateTime<Utc>>,
+    pub last_login_ip: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum AccountStatus {
+    Active,
+    Inactive,
+    Suspended,
+    PendingDeletion,
+    Deleted,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -43,11 +55,47 @@ pub struct UserResponse {
     pub is_email_verified: bool,
     pub created_at: DateTime<Utc>,
     pub has_password: bool,
+    pub account_status: AccountStatus,
+    pub last_login_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitializePasswordRequest {
     pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateAccountStatusRequest {
+    pub status: AccountStatus,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AccountStatusResponse {
+    pub user_id: String,
+    pub status: AccountStatus,
+    pub updated_at: DateTime<Utc>,
+    pub updated_by: String,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserListRequest {
+    pub page: Option<u32>,
+    pub limit: Option<u32>,
+    pub status: Option<AccountStatus>,
+    pub search: Option<String>,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserListResponse {
+    pub users: Vec<UserResponse>,
+    pub total: u64,
+    pub page: u32,
+    pub limit: u32,
+    pub total_pages: u32,
 }
 
 impl From<User> for UserResponse {
@@ -58,6 +106,14 @@ impl From<User> for UserResponse {
             is_email_verified: user.is_email_verified,
             created_at: user.created_at,
             has_password: user.password_hash.is_some(),
+            account_status: user.account_status,
+            last_login_at: user.last_login_at,
         }
+    }
+}
+
+impl Default for AccountStatus {
+    fn default() -> Self {
+        AccountStatus::Active
     }
 }

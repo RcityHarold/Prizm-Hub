@@ -7,3 +7,6 @@ pub mod account_lockout;
 pub mod role;
 pub mod permission;
 pub mod user_role;
+pub mod user_profile;
+pub mod user_preferences;
+pub mod user_activity;

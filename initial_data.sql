@@ -139,6 +139,52 @@ CREATE permission:audit_read CONTENT {
     updated_at: time::now()
 };
 
+-- 用户档案管理权限
+CREATE permission:profile_read CONTENT {
+    name: "profile.read",
+    display_name: "查看用户档案",
+    description: "查看用户档案信息",
+    resource: "profile",
+    action: "read",
+    is_system: true,
+    created_at: time::now(),
+    updated_at: time::now()
+};
+
+CREATE permission:profile_write CONTENT {
+    name: "profile.write",
+    display_name: "管理用户档案",
+    description: "创建和编辑用户档案",
+    resource: "profile",
+    action: "write",
+    is_system: true,
+    created_at: time::now(),
+    updated_at: time::now()
+};
+
+-- 用户偏好设置权限
+CREATE permission:preferences_read CONTENT {
+    name: "preferences.read",
+    display_name: "查看用户偏好",
+    description: "查看用户偏好设置",
+    resource: "preferences",
+    action: "read",
+    is_system: true,
+    created_at: time::now(),
+    updated_at: time::now()
+};
+
+CREATE permission:preferences_write CONTENT {
+    name: "preferences.write",
+    display_name: "管理用户偏好",
+    description: "创建和编辑用户偏好设置",
+    resource: "preferences",
+    action: "write",
+    is_system: true,
+    created_at: time::now(),
+    updated_at: time::now()
+};
+
 -- 创建系统角色
 -- 系统管理员角色
 CREATE role:admin CONTENT {
@@ -196,6 +242,9 @@ CREATE user:system CONTENT {
     password: NONE,
     verified: true,
     verification_token: NONE,
+    account_status: "Active",
+    last_login_at: NONE,
+    last_login_ip: NONE,
     created_at: time::now(),
     updated_at: time::now()
 };
@@ -285,6 +334,34 @@ CREATE role_permission CONTENT {
     granted_by: user:system
 };
 
+CREATE role_permission CONTENT {
+    role_id: role:admin,
+    permission_id: permission:profile_read,
+    granted_at: time::now(),
+    granted_by: user:system
+};
+
+CREATE role_permission CONTENT {
+    role_id: role:admin,
+    permission_id: permission:profile_write,
+    granted_at: time::now(),
+    granted_by: user:system
+};
+
+CREATE role_permission CONTENT {
+    role_id: role:admin,
+    permission_id: permission:preferences_read,
+    granted_at: time::now(),
+    granted_by: user:system
+};
+
+CREATE role_permission CONTENT {
+    role_id: role:admin,
+    permission_id: permission:preferences_write,
+    granted_at: time::now(),
+    granted_by: user:system
+};
+
 -- 为user_manager角色分配用户管理权限
 CREATE role_permission CONTENT {
     role_id: role:user_manager,
@@ -303,6 +380,34 @@ CREATE role_permission CONTENT {
 CREATE role_permission CONTENT {
     role_id: role:user_manager,
     permission_id: permission:users_delete,
+    granted_at: time::now(),
+    granted_by: user:system
+};
+
+CREATE role_permission CONTENT {
+    role_id: role:user_manager,
+    permission_id: permission:profile_read,
+    granted_at: time::now(),
+    granted_by: user:system
+};
+
+CREATE role_permission CONTENT {
+    role_id: role:user_manager,
+    permission_id: permission:profile_write,
+    granted_at: time::now(),
+    granted_by: user:system
+};
+
+CREATE role_permission CONTENT {
+    role_id: role:user_manager,
+    permission_id: permission:preferences_read,
+    granted_at: time::now(),
+    granted_by: user:system
+};
+
+CREATE role_permission CONTENT {
+    role_id: role:user_manager,
+    permission_id: permission:preferences_write,
     granted_at: time::now(),
     granted_by: user:system
 };

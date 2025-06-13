@@ -468,6 +468,22 @@ impl axum::response::IntoResponse for AuthError {
                 axum::http::StatusCode::FORBIDDEN,
                 "Insufficient permissions".to_string(),
             ),
+            AuthError::AccountSuspended => (
+                axum::http::StatusCode::FORBIDDEN,
+                "Account suspended".to_string(),
+            ),
+            AuthError::AccountInactive => (
+                axum::http::StatusCode::FORBIDDEN,
+                "Account inactive".to_string(),
+            ),
+            AuthError::AccountDeleted => (
+                axum::http::StatusCode::FORBIDDEN,
+                "Account deleted".to_string(),
+            ),
+            AuthError::Forbidden(msg) => (
+                axum::http::StatusCode::FORBIDDEN,
+                msg.clone(),
+            ),
         };
 
         let body = Json(serde_json::json!({

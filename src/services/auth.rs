@@ -160,6 +160,9 @@ impl AuthService {
             updated_at: now,
             is_email_verified: true, // OAuth 邮箱已验证
             verification_token: None,
+            account_status: crate::models::user::AccountStatus::Active,
+            last_login_at: Some(now),
+            last_login_ip: Some("0.0.0.0".to_string()),
         };
 
         debug!("Creating new user record: {:?}", user);
@@ -222,6 +225,9 @@ impl AuthService {
             updated_at: now,
             is_email_verified: false,
             verification_token: Some(verification_token.clone()),
+            account_status: crate::models::user::AccountStatus::Active,
+            last_login_at: None,
+            last_login_ip: None,
         };
 
         let created_user = self.db.create_record("user", &user).await?;
@@ -238,7 +244,7 @@ impl AuthService {
 
     pub async fn login(&self, email: String, password: String) -> Result<AuthResponse> {
         // 查找用户
-        let user = self.db.find_record_by_field::<User>(
+        let mut user = self.db.find_record_by_field::<User>(
             "user",
             "email",
             &email,
@@ -261,8 +267,35 @@ impl AuthService {
             return Err(AuthError::EmailNotVerified);
         }
 
+        // 检查账户状态
+        match user.account_status {
+            crate::models::user::AccountStatus::Suspended => {
+                return Err(AuthError::AccountSuspended);
+            }
+            crate::models::user::AccountStatus::Inactive => {
+                return Err(AuthError::AccountInactive);
+            }
+            crate::models::user::AccountStatus::PendingDeletion | 
+            crate::models::user::AccountStatus::Deleted => {
+                return Err(AuthError::AccountDeleted);
+            }
+            crate::models::user::AccountStatus::Active => {
+                // 继续登录流程
+            }
+        }
+
+        // 更新最后登录信息
+        let now = Utc::now();
+        user.last_login_at = Some(now);
+        user.last_login_ip = Some("0.0.0.0".to_string()); // 这里应该从请求中获取真实IP
+        user.updated_at = now;
+
+        // 更新用户记录
+        let user_thing = user.id.as_ref().unwrap();
+        let updated_user = self.db.update_record("user", user_thing, &user).await?;
+
         // 创建会话
-        self.create_session(user).await
+        self.create_session(updated_user).await
     }
 
     async fn create_session(&self, user: User) -> Result<AuthResponse> {

@@ -6,3 +6,4 @@ pub mod rate_limiter;
 pub mod mfa;
 pub mod account_lockout;
 pub mod rbac;
+pub mod user_management;

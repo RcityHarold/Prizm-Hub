@@ -48,6 +48,18 @@ pub enum AuthError {
     
     #[error("Insufficient permissions")]
     InsufficientPermissions,
+    
+    #[error("Account suspended")]
+    AccountSuspended,
+    
+    #[error("Account inactive")]
+    AccountInactive,
+    
+    #[error("Account deleted")]
+    AccountDeleted,
+    
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
 }
 
 impl From<reqwest::Error> for AuthError {

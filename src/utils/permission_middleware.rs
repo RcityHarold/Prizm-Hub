@@ -162,16 +162,32 @@ fn extract_required_permission<B>(req: &Request<B>) -> Option<String> {
     }
 }
 
-/// 权限检查宏，用于简化权限检查代码
+/// 权限检查宏（返回AuthError），用于简化权限检查代码
 #[macro_export]
 macro_rules! require_permission {
-    ($db:expr, $user:expr, $permission:expr) => {{
+    ($db:expr, $user_id:expr, $permission:expr) => {{
         let rbac_service = crate::services::rbac::RBACService::new($db.clone());
-        let user_id = $user.id.as_ref()
-            .ok_or_else(|| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?
-            .id.to_string();
         
-        match rbac_service.check_user_permission(&user_id, $permission).await {
+        match rbac_service.check_user_permission($user_id, $permission).await {
+            Ok(has_permission) => {
+                if !has_permission {
+                    return Err(crate::error::AuthError::Forbidden("Insufficient permissions".to_string()));
+                }
+            }
+            Err(e) => {
+                return Err(crate::error::AuthError::DatabaseError(format!("Permission check failed: {}", e)));
+            }
+        }
+    }};
+}
+
+/// 权限检查宏（返回StatusCode），用于返回StatusCode的路由处理器
+#[macro_export]
+macro_rules! require_permission_status {
+    ($db:expr, $user_id:expr, $permission:expr) => {{
+        let rbac_service = crate::services::rbac::RBACService::new($db.clone());
+        
+        match rbac_service.check_user_permission($user_id, $permission).await {
             Ok(has_permission) => {
                 if !has_permission {
                     return Err(axum::http::StatusCode::FORBIDDEN);
@@ -187,20 +203,17 @@ macro_rules! require_permission {
 /// 角色检查宏
 #[macro_export]
 macro_rules! require_role {
-    ($db:expr, $user:expr, $role:expr) => {{
+    ($db:expr, $user_id:expr, $role:expr) => {{
         let rbac_service = crate::services::rbac::RBACService::new($db.clone());
-        let user_id = $user.id.as_ref()
-            .ok_or_else(|| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?
-            .id.to_string();
         
-        match rbac_service.check_user_role(&user_id, $role).await {
+        match rbac_service.check_user_role($user_id, $role).await {
             Ok(has_role) => {
                 if !has_role {
-                    return Err(axum::http::StatusCode::FORBIDDEN);
+                    return Err(crate::error::AuthError::Forbidden("Insufficient role".to_string()));
                 }
             }
-            Err(_) => {
-                return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+            Err(e) => {
+                return Err(crate::error::AuthError::DatabaseError(format!("Role check failed: {}", e)));
             }
         }
     }};
@@ -209,8 +222,8 @@ macro_rules! require_role {
 /// 管理员权限检查宏
 #[macro_export]
 macro_rules! require_admin {
-    ($db:expr, $user:expr) => {{
-        crate::require_role!($db, $user, "admin");
+    ($db:expr, $user_id:expr) => {{
+        crate::require_role!($db, $user_id, "admin");
     }};
 }
 

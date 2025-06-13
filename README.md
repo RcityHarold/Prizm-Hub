@@ -24,15 +24,17 @@
 - **权限继承**: 角色权限自动继承和聚合
 - **权限保护**: API接口级别的权限控制
 
-### 用户管理
-- 用户注册（需邮箱验证）
-- 用户登录
-- 强制邮箱验证
-- 获取用户信息
-- OAuth 用户管理
-- 完整的会话管理
-- 密码重置和恢复
-- 基于角色的用户权限管理
+### 用户生命周期管理 👤
+- **完整用户档案管理**: 个人信息、联系方式、头像管理
+- **账户状态控制**: Active、Inactive、Suspended、PendingDeletion、Deleted
+- **用户偏好设置**: 主题、语言、通知设置、安全偏好
+- **用户活动审计**: 详细操作日志、分类管理、查询过滤
+- **管理员功能**: 用户列表管理、批量操作、状态变更
+- **最后登录追踪**: 登录时间和IP地址记录
+- **用户注册和验证**: 邮箱验证、OAuth用户管理
+- **完整的会话管理**: 登录、登出、会话列表
+- **密码重置和恢复**: 安全的重置流程
+- **基于角色的用户权限管理**: 与RBAC系统完全集成
 
 ### 安全防护层 🛡️
 - **速率限制 (Rate Limiting)**: 防止暴力破解和API滥用
@@ -49,8 +51,16 @@
 - 时效性密码重置令牌
 - 安全的JWT密钥管理
 
-### 最新更新 (权限系统完成版本) 🎉
-- 🔐 **权限系统完成**: 完整的RBAC（基于角色的访问控制）系统
+### 最新更新 (用户生命周期管理完成版本) 🎉
+- 👤 **用户生命周期管理完成**: 完整的用户管理体系（第三阶段已完成）
+  - ✅ **用户档案系统**: 完整个人信息管理、联系方式、头像支持
+  - ✅ **账户状态管理**: 五种状态控制（Active、Inactive、Suspended、PendingDeletion、Deleted）
+  - ✅ **用户偏好设置**: 主题、语言、通知、安全偏好等个性化配置
+  - ✅ **活动审计系统**: 详细操作日志、分类管理、时间范围查询
+  - ✅ **管理员功能**: 用户列表、搜索、状态变更、批量管理
+  - ✅ **登录追踪**: 最后登录时间和IP地址记录
+  - ✅ **权限集成**: 与RBAC系统完全集成的权限控制
+- 🔐 **权限系统完成**: 完整的RBAC（基于角色的访问控制）系统（第二阶段已完成）
   - ✅ **角色管理**: 创建、编辑、查询角色，支持系统角色和自定义角色
   - ✅ **权限管理**: 基于资源和操作的细粒度权限控制
   - ✅ **用户角色分配**: 灵活的用户角色分配和移除机制
@@ -70,7 +80,7 @@
 - ✨ **新功能**: 真正的会话管理系统（登出、会话列表、批量登出）
 - 🔧 **修复**: 邮箱验证逻辑优化（注册后强制验证才能登录）
 - 🔧 **修复**: OAuth 用户记录处理改进
-- 📊 **数据库**: 新增 password_reset_token、session、user_mfa、account_lockout、role、permission、user_role、role_permission 表
+- 📊 **数据库**: 新增 password_reset_token、session、user_mfa、account_lockout、role、permission、user_role、role_permission、user_profile、user_preferences、user_activity 表
 
 ## 技术栈
 
@@ -159,6 +169,9 @@ DEFINE TABLE user SCHEMALESS;
 - email: string - 用户邮箱
 - password: string - 加密后的密码
 - email_verified: bool - 邮箱验证状态
+- account_status: string - 账户状态（Active、Inactive、Suspended、PendingDeletion、Deleted）
+- last_login_at: number - 最后登录时间戳
+- last_login_ip: string - 最后登录IP地址
 - created_at: datetime - 创建时间
 - updated_at: datetime - 更新时间
 
@@ -289,6 +302,67 @@ DEFINE TABLE role_permission SCHEMAFULL;
 - granted_at: number - 授权时间戳
 - granted_by: record(user) - 授权者用户ID
 
+### 用户档案表 (user_profile)
+```sql
+DEFINE TABLE user_profile SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 档案唯一标识符
+- user_id: record(user) - 关联的用户ID
+- first_name: string - 名字
+- last_name: string - 姓氏
+- display_name: string - 显示名称
+- avatar_url: string - 头像URL
+- phone: string - 电话号码
+- date_of_birth: datetime - 出生日期
+- timezone: string - 时区
+- locale: string - 地区语言
+- bio: string - 个人简介
+- website: string - 个人网站
+- location: string - 位置信息
+- created_at: number - 创建时间戳
+- updated_at: number - 更新时间戳
+
+### 用户偏好表 (user_preferences)
+```sql
+DEFINE TABLE user_preferences SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 偏好唯一标识符
+- user_id: record(user) - 关联的用户ID
+- theme: string - 主题（light、dark、auto）
+- language: string - 语言代码
+- email_notifications: bool - 邮件通知开关
+- sms_notifications: bool - 短信通知开关
+- marketing_emails: bool - 营销邮件开关
+- security_emails: bool - 安全邮件开关
+- newsletter: bool - 新闻通讯开关
+- two_factor_required: bool - 是否强制双因素认证
+- session_timeout: number - 会话超时时间（秒）
+- timezone: string - 用户时区
+- date_format: string - 日期格式
+- time_format: string - 时间格式
+- created_at: number - 创建时间戳
+- updated_at: number - 更新时间戳
+
+### 用户活动日志表 (user_activity)
+```sql
+DEFINE TABLE user_activity SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 活动唯一标识符
+- user_id: record(user) - 关联的用户ID
+- action: string - 操作名称
+- category: string - 活动分类（Authentication、Profile、Security、Permissions、Data、System）
+- ip_address: string - IP地址
+- user_agent: string - 用户代理
+- details: object - 详细信息JSON
+- status: string - 状态（Success、Failed、Warning、Info）
+- timestamp: number - 时间戳
+
 ## API 端点
 
 ### 用户认证
@@ -352,6 +426,27 @@ DEFINE TABLE role_permission SCHEMAFULL;
 #### 权限检查
 - `GET /api/rbac/check/permission/:permission_name` - 检查当前用户是否具有指定权限
 - `GET /api/rbac/check/role/:role_name` - 检查当前用户是否具有指定角色
+
+### 用户生命周期管理 👤
+#### 用户档案管理
+- `POST /api/users/profile` - 创建用户档案
+- `GET /api/users/profile` - 获取当前用户档案
+- `PUT /api/users/profile` - 更新当前用户档案
+
+#### 用户偏好设置
+- `POST /api/users/preferences` - 创建用户偏好设置
+- `GET /api/users/preferences` - 获取当前用户偏好设置
+- `PUT /api/users/preferences` - 更新当前用户偏好设置
+
+#### 用户活动日志
+- `GET /api/users/activity-log` - 获取当前用户活动日志（支持分页和过滤）
+
+#### 管理员功能（需要相应权限）
+- `GET /api/users/users` - 获取用户列表（需要users.read权限）
+- `PUT /api/users/users/:user_id/status` - 更新用户账户状态（需要users.write权限）
+- `GET /api/users/users/:user_id/profile` - 查看指定用户档案（需要users.read权限）
+- `GET /api/users/users/:user_id/preferences` - 查看指定用户偏好（需要users.read权限）
+- `GET /api/users/users/:user_id/activity-log` - 查看指定用户活动日志（需要audit.read权限）
 
 ## API 示例
 
@@ -780,6 +875,185 @@ curl http://localhost:8080/api/rbac/users/user123/roles \
 }
 ```
 
+### 用户生命周期管理示例
+
+#### 创建用户档案
+```bash
+# 请求
+curl -X POST http://localhost:8080/api/users/profile \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "张",
+    "last_name": "三",
+    "display_name": "张三",
+    "phone": "+86-13812345678",
+    "timezone": "Asia/Shanghai",
+    "locale": "zh-CN",
+    "bio": "这是我的个人简介",
+    "website": "https://zhangsan.com",
+    "location": "北京, 中国"
+  }'
+
+# 成功响应 (200 OK)
+{
+  "success": true,
+  "data": {
+    "id": "profile_abc123",
+    "user_id": "user_xyz789",
+    "first_name": "张",
+    "last_name": "三",
+    "display_name": "张三",
+    "avatar_url": null,
+    "phone": "+86-13812345678",
+    "timezone": "Asia/Shanghai",
+    "locale": "zh-CN",
+    "bio": "这是我的个人简介",
+    "website": "https://zhangsan.com",
+    "location": "北京, 中国",
+    "created_at": "2025-04-01T12:00:00Z",
+    "updated_at": "2025-04-01T12:00:00Z"
+  },
+  "message": "User profile created successfully"
+}
+```
+
+#### 创建用户偏好设置
+```bash
+# 请求
+curl -X POST http://localhost:8080/api/users/preferences \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "theme": "dark",
+    "language": "zh-CN",
+    "email_notifications": true,
+    "sms_notifications": false,
+    "marketing_emails": false,
+    "security_emails": true,
+    "newsletter": false,
+    "two_factor_required": true,
+    "session_timeout": 7200,
+    "timezone": "Asia/Shanghai",
+    "date_format": "YYYY-MM-DD",
+    "time_format": "24h"
+  }'
+
+# 成功响应 (200 OK)
+{
+  "success": true,
+  "data": {
+    "id": "prefs_def456",
+    "user_id": "user_xyz789",
+    "theme": "dark",
+    "language": "zh-CN",
+    "email_notifications": true,
+    "sms_notifications": false,
+    "marketing_emails": false,
+    "security_emails": true,
+    "newsletter": false,
+    "two_factor_required": true,
+    "session_timeout": 7200,
+    "timezone": "Asia/Shanghai",
+    "date_format": "YYYY-MM-DD",
+    "time_format": "24h",
+    "created_at": "2025-04-01T12:30:00Z",
+    "updated_at": "2025-04-01T12:30:00Z"
+  },
+  "message": "User preferences created successfully"
+}
+```
+
+#### 更新用户账户状态（管理员功能）
+```bash
+# 请求
+curl -X PUT http://localhost:8080/api/users/users/user123/status \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "Suspended",
+    "reason": "违反用户协议"
+  }'
+
+# 成功响应 (200 OK)
+{
+  "success": true,
+  "data": {
+    "user_id": "user123",
+    "status": "Suspended",
+    "updated_at": "2025-04-01T13:00:00Z",
+    "updated_by": "admin@example.com",
+    "reason": "违反用户协议"
+  },
+  "message": "Account status updated successfully"
+}
+```
+
+#### 获取用户活动日志
+```bash
+# 请求
+curl "http://localhost:8080/api/users/activity-log?page=1&limit=10&category=Profile" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# 成功响应 (200 OK)
+{
+  "success": true,
+  "data": {
+    "activities": [
+      {
+        "id": "activity_ghi789",
+        "user_id": "user_xyz789",
+        "action": "profile_updated",
+        "category": "Profile",
+        "ip_address": "192.168.1.100",
+        "user_agent": "Mozilla/5.0...",
+        "details": {
+          "action": "profile_updated",
+          "fields": ["display_name", "bio"]
+        },
+        "status": "Success",
+        "timestamp": "2025-04-01T12:15:00Z"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "limit": 10,
+    "total_pages": 1
+  },
+  "message": "User activity log retrieved successfully"
+}
+```
+
+#### 获取用户列表（管理员功能）
+```bash
+# 请求
+curl "http://localhost:8080/api/users/users?page=1&limit=10&status=Active&search=zhang" \
+  -H "Authorization: Bearer admin-jwt-token"
+
+# 成功响应 (200 OK)
+{
+  "success": true,
+  "data": {
+    "users": [
+      {
+        "id": "user_xyz789",
+        "email": "zhangsan@example.com",
+        "is_email_verified": true,
+        "account_status": "Active",
+        "last_login_at": "2025-04-01T12:00:00Z",
+        "created_at": "2025-03-01T10:00:00Z",
+        "has_password": true
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "limit": 10,
+    "total_pages": 1
+  },
+  "message": "Users retrieved successfully"
+}
+```
+
 ### 安全状态检查示例
 
 #### 检查账户锁定状态
@@ -929,12 +1203,15 @@ curl http://localhost:8080/api/auth/security/lockout-status \
 - [x] **权限保护**: API接口级别的权限控制
 - [x] **实时权限验证**: 毫秒级权限检查，支持动态权限变更
 
-### 📋 第三阶段：用户管理 (规划中)
-- [ ] 完善的用户生命周期管理
-- [ ] 用户资料管理和更新
-- [ ] 账户删除和数据清理
-- [ ] 用户偏好设置
-- [ ] 头像和个人信息管理
+### 🎉 第三阶段：用户生命周期管理 ✅ (已完成)
+- [x] **完善的用户生命周期管理**: 完整的用户管理体系
+- [x] **用户档案管理**: 个人信息、联系方式、头像管理
+- [x] **账户状态控制**: 五种状态管理（Active、Inactive、Suspended、PendingDeletion、Deleted）
+- [x] **用户偏好设置**: 主题、语言、通知、安全偏好配置
+- [x] **用户活动审计**: 详细操作日志、分类管理、查询过滤
+- [x] **管理员功能**: 用户列表管理、搜索、状态变更、批量操作
+- [x] **登录追踪**: 最后登录时间和IP地址记录
+- [x] **权限集成**: 与RBAC系统完全集成的权限控制
 
 ### 📋 第四阶段：监控审计 (规划中)
 - [x] **基础安全日志**: 速率限制、账户锁定、MFA事件记录 ✅
