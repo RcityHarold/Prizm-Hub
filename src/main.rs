@@ -93,6 +93,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/api/auth", routes::auth::router(shared_db.clone()))
         .nest("/api/rbac", routes::rbac::router())
         .nest("/api/users", routes::user_management::router())
+        .nest("/api/audit", routes::audit::audit_routes())
         .layer(Extension(shared_db))
         .layer(Extension(Arc::new(app_state)))
         .layer(Extension(config.clone()))  // 添加 Config 扩展

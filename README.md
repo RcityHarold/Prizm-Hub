@@ -43,6 +43,16 @@
 - **智能安全检查**: 基于IP和用户的双重保护
 - **自动安全管理**: 过期记录清理和动态解锁
 
+### 监控审计系统 📊
+- **安全仪表板**: 实时安全指标概览和趋势分析
+- **审计日志分析**: 用户活动分类统计和行为分析 
+- **安全事件监控**: 失败登录、权限拒绝、可疑活动检测
+- **系统健康监控**: 数据库状态、内存使用、连接池监控
+- **安全报告生成**: 自动生成详细的安全分析报告
+- **威胁检测**: 基于行为模式的异常活动识别
+- **性能指标**: 认证成功率、锁定统计、速率限制违规
+- **风险评估**: 自动风险级别计算和安全建议
+
 ### 安全增强功能
 - 基于数据库的会话存储
 - 会话主动失效（登出）
@@ -51,7 +61,16 @@
 - 时效性密码重置令牌
 - 安全的JWT密钥管理
 
-### 最新更新 (用户生命周期管理完成版本) 🎉
+### 最新更新 (监控审计系统完成版本) 🎉
+- 📊 **监控审计系统完成**: 全面的安全监控和审计体系（第四阶段已完成）
+  - ✅ **安全仪表板**: 实时安全指标概览和趋势分析
+  - ✅ **审计日志分析**: 用户活动分类统计和行为分析
+  - ✅ **安全事件监控**: 失败登录、权限拒绝、可疑活动检测
+  - ✅ **系统健康监控**: 数据库状态、内存使用、连接池监控
+  - ✅ **安全报告生成**: 自动生成详细的安全分析报告
+  - ✅ **威胁检测**: 基于行为模式的异常活动识别
+  - ✅ **性能指标**: 认证成功率、锁定统计、速率限制违规
+  - ✅ **风险评估**: 自动风险级别计算和安全建议
 - 👤 **用户生命周期管理完成**: 完整的用户管理体系（第三阶段已完成）
   - ✅ **用户档案系统**: 完整个人信息管理、联系方式、头像支持
   - ✅ **账户状态管理**: 五种状态控制（Active、Inactive、Suspended、PendingDeletion、Deleted）
@@ -81,6 +100,7 @@
 - 🔧 **修复**: 邮箱验证逻辑优化（注册后强制验证才能登录）
 - 🔧 **修复**: OAuth 用户记录处理改进
 - 📊 **数据库**: 新增 password_reset_token、session、user_mfa、account_lockout、role、permission、user_role、role_permission、user_profile、user_preferences、user_activity 表
+- 📊 **监控审计**: 完整的审计API端点集，支持安全仪表板、指标分析、系统健康监控和安全报告生成
 
 ## 技术栈
 
@@ -426,6 +446,14 @@ DEFINE TABLE user_activity SCHEMAFULL;
 #### 权限检查
 - `GET /api/rbac/check/permission/:permission_name` - 检查当前用户是否具有指定权限
 - `GET /api/rbac/check/role/:role_name` - 检查当前用户是否具有指定角色
+
+### 监控审计系统 📊
+#### 安全仪表板（需要audit.read权限）
+- `GET /api/audit/dashboard` - 获取安全仪表板概览（支持days参数）
+- `GET /api/audit/security-metrics` - 获取安全指标详情（支持hours参数）
+- `GET /api/audit/activity-summary` - 获取活动统计汇总（支持days参数）
+- `GET /api/audit/system-health` - 获取系统健康状态（需要security.read权限）
+- `GET /api/audit/security-report` - 生成安全分析报告（支持days参数）
 
 ### 用户生命周期管理 👤
 #### 用户档案管理
@@ -875,6 +903,200 @@ curl http://localhost:8080/api/rbac/users/user123/roles \
 }
 ```
 
+### 监控审计系统示例
+
+#### 获取安全仪表板
+```bash
+# 请求
+curl "http://localhost:8080/api/audit/dashboard?days=7" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# 成功响应 (200 OK)
+{
+  "period": "Last 7 days",
+  "total_users": 150,
+  "active_sessions": 25,
+  "failed_logins": 12,
+  "locked_accounts": 2,
+  "security_events": 8,
+  "top_activities": [
+    {
+      "action": "login_success",
+      "count": 340,
+      "percentage": 65.4
+    },
+    {
+      "action": "profile_updated",
+      "count": 89,
+      "percentage": 17.1
+    }
+  ],
+  "login_trends": [
+    {
+      "timestamp": "2025-04-07T00:00:00Z",
+      "value": 45
+    }
+  ],
+  "security_trends": [
+    {
+      "timestamp": "2025-04-07T00:00:00Z",
+      "value": 3
+    }
+  ]
+}
+```
+
+#### 获取安全指标
+```bash
+# 请求
+curl "http://localhost:8080/api/audit/security-metrics?hours=24" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# 成功响应 (200 OK)
+{
+  "period": "Last 24 hours",
+  "authentication_stats": {
+    "successful_logins": 127,
+    "failed_logins": 15,
+    "oauth_logins": 23,
+    "password_resets": 3,
+    "success_rate": 89.4
+  },
+  "lockout_stats": {
+    "user_lockouts": 2,
+    "ip_lockouts": 1,
+    "active_lockouts": 1,
+    "average_lockout_duration_minutes": 15.0
+  },
+  "rate_limit_violations": 5,
+  "permission_denials": 8,
+  "failed_login_by_ip": [
+    {
+      "ip_address": "192.168.1.100",
+      "failed_attempts": 7,
+      "is_locked": false,
+      "last_attempt": "2025-04-07T14:30:00Z"
+    }
+  ],
+  "suspicious_activities": [
+    {
+      "user_id": "user_123",
+      "ip_address": "10.0.0.50",
+      "activity_type": "login_failed",
+      "count": 8,
+      "risk_score": 6,
+      "first_seen": "2025-04-07T12:00:00Z",
+      "last_seen": "2025-04-07T14:30:00Z"
+    }
+  ]
+}
+```
+
+#### 获取系统健康状态
+```bash
+# 请求
+curl http://localhost:8080/api/audit/system-health \
+  -H "Authorization: Bearer your-jwt-token"
+
+# 成功响应 (200 OK)
+{
+  "timestamp": "2025-04-07T15:00:00Z",
+  "database_status": {
+    "connected": true,
+    "response_time_ms": 12,
+    "connection_pool_used": 3,
+    "connection_pool_size": 10
+  },
+  "active_sessions_count": 25,
+  "pending_lockouts": 1,
+  "memory_usage": {
+    "used_mb": 128.0,
+    "available_mb": 512.0,
+    "usage_percentage": 25.0
+  },
+  "uptime_seconds": 3600
+}
+```
+
+#### 生成安全报告
+```bash
+# 请求
+curl "http://localhost:8080/api/audit/security-report?days=30" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# 成功响应 (200 OK)
+{
+  "generated_at": "2025-04-07T15:00:00Z",
+  "period": "Last 30 days",
+  "executive_summary": {
+    "total_users": 150,
+    "active_users": 89,
+    "security_incidents": 12,
+    "success_rate": 94.2,
+    "risk_level": "Low"
+  },
+  "authentication_analysis": {
+    "login_patterns": [
+      {
+        "pattern_type": "Regular Login",
+        "count": 100,
+        "trend": "Stable"
+      }
+    ],
+    "failure_analysis": [
+      {
+        "failure_reason": "Invalid Password",
+        "count": 25,
+        "percentage": 75.0
+      }
+    ],
+    "geographic_distribution": [
+      {
+        "country": "US",
+        "region": "California",
+        "count": 80
+      }
+    ]
+  },
+  "security_incidents": [
+    {
+      "id": "incident_001",
+      "incident_type": "Multiple Failed Logins",
+      "severity": "Medium",
+      "affected_user": "user_123",
+      "ip_address": "192.168.1.100",
+      "description": "Multiple failed login attempts from same IP",
+      "timestamp": "2025-04-07T13:00:00Z",
+      "resolved": false
+    }
+  ],
+  "user_behavior_analysis": {
+    "login_frequency_distribution": [
+      {
+        "frequency_range": "Daily",
+        "user_count": 50,
+        "percentage": 60.0
+      }
+    ],
+    "peak_activity_hours": [9, 10, 11, 14, 15, 16],
+    "user_retention_metrics": {
+      "daily_retention": 85.0,
+      "weekly_retention": 70.0,
+      "monthly_retention": 60.0
+    }
+  },
+  "recommendations": [
+    {
+      "priority": "Low",
+      "category": "General",
+      "title": "Security Status Normal",
+      "description": "No critical security issues detected in the analysis period. Continue monitoring and maintain current security practices.",
+      "estimated_impact": "Low"
+    }
+  ]
+}
+```
+
 ### 用户生命周期管理示例
 
 #### 创建用户档案
@@ -1213,13 +1435,17 @@ curl http://localhost:8080/api/auth/security/lockout-status \
 - [x] **登录追踪**: 最后登录时间和IP地址记录
 - [x] **权限集成**: 与RBAC系统完全集成的权限控制
 
-### 📋 第四阶段：监控审计 (规划中)
+### 🎉 第四阶段：监控审计 ✅ (已完成)
 - [x] **基础安全日志**: 速率限制、账户锁定、MFA事件记录 ✅
 - [x] **登录历史追踪**: IP地址、设备信息记录 ✅  
-- [ ] 高级审计日志和监控仪表板
-- [ ] 安全事件实时告警系统
-- [ ] 深度用户行为分析
-- [ ] 安全报告和统计图表
+- [x] **安全仪表板**: 实时安全指标概览和趋势分析 ✅
+- [x] **审计日志分析**: 用户活动分类统计和行为分析 ✅
+- [x] **安全事件监控**: 失败登录、权限拒绝、可疑活动检测 ✅
+- [x] **系统健康监控**: 数据库状态、内存使用、连接池监控 ✅
+- [x] **安全报告生成**: 自动生成详细的安全分析报告 ✅
+- [x] **威胁检测**: 基于行为模式的异常活动识别 ✅
+- [x] **性能指标**: 认证成功率、锁定统计、速率限制违规 ✅
+- [x] **风险评估**: 自动风险级别计算和安全建议 ✅
 
 ### 📋 未来增强功能
 - [x] **设备指纹识别**: 基础IP和设备信息追踪 ✅
