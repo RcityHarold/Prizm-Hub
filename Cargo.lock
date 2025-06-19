@@ -3174,6 +3174,8 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "serde_urlencoded",
+ "sha2",
  "surrealdb",
  "thiserror 1.0.69",
  "tokio",
@@ -3183,6 +3185,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "urlencoding",
  "uuid",
  "validator",
 ]

@@ -12,17 +12,12 @@ use validator::Validate;
 use crate::{
     models::{
         oidc_client::{CreateOidcClientRequest, OidcClientResponse},
-        user::User,
     },
     services::{
         oidc_client_management::OidcClientService,
         database::Database,
     },
     error::AuthError,
-    utils::{
-        jwt::get_user_from_token,
-        permission_middleware::require_permission,
-    },
 };
 
 pub fn oidc_client_routes() -> Router {

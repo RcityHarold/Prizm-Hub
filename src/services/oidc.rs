@@ -352,14 +352,14 @@ impl OidcService {
 
         let claims = IdTokenClaims {
             iss: self.config.app_url.clone(),
-            sub: user.id.as_ref().unwrap().clone(),
+            sub: user.id.as_ref().unwrap().id.to_string(),
             aud: client.client_id.clone(),
             exp,
             iat: now,
-            auth_time: user.last_login_at.unwrap_or(now),
+            auth_time: user.last_login_at.map(|dt| dt.timestamp()).unwrap_or(now),
             nonce: nonce.map(|n| n.to_string()),
             email: Some(user.email.clone()),
-            email_verified: Some(user.verified),
+            email_verified: Some(user.is_email_verified),
             name: None, // 需要从用户档案获取
             preferred_username: Some(user.email.clone()),
             profile: None,
@@ -381,14 +381,14 @@ impl OidcService {
         let user = self.get_user_by_id(&token.user_id).await?;
         
         Ok(UserInfoResponse {
-            sub: user.id.unwrap(),
-            email: Some(user.email),
-            email_verified: Some(user.verified),
+            sub: user.id.unwrap().id.to_string(),
+            email: Some(user.email.clone()),
+            email_verified: Some(user.is_email_verified),
             name: None, // 需要从用户档案获取
             preferred_username: Some(user.email),
             profile: None,
             picture: None,
-            updated_at: Some(user.updated_at),
+            updated_at: Some(user.updated_at.timestamp()),
         })
     }
 
@@ -428,47 +428,47 @@ impl OidcService {
         Err(anyhow!("Not implemented"))
     }
 
-    async fn save_authorization_code(&self, code: &OidcAuthorizationCode) -> Result<()> {
+    async fn save_authorization_code(&self, _code: &OidcAuthorizationCode) -> Result<()> {
         // TODO: 实现数据库保存
         Ok(())
     }
 
-    async fn get_authorization_code(&self, code: &str) -> Result<OidcAuthorizationCode> {
+    async fn get_authorization_code(&self, _code: &str) -> Result<OidcAuthorizationCode> {
         // TODO: 实现数据库查询
         Err(anyhow!("Not implemented"))
     }
 
-    async fn update_authorization_code(&self, code: &OidcAuthorizationCode) -> Result<()> {
+    async fn update_authorization_code(&self, _code: &OidcAuthorizationCode) -> Result<()> {
         // TODO: 实现数据库更新
         Ok(())
     }
 
-    async fn save_access_token(&self, token: &OidcAccessToken) -> Result<()> {
+    async fn save_access_token(&self, _token: &OidcAccessToken) -> Result<()> {
         // TODO: 实现数据库保存
         Ok(())
     }
 
-    async fn get_access_token(&self, token: &str) -> Result<OidcAccessToken> {
+    async fn get_access_token(&self, _token: &str) -> Result<OidcAccessToken> {
         // TODO: 实现数据库查询
         Err(anyhow!("Not implemented"))
     }
 
-    async fn revoke_access_token(&self, token: &str) -> Result<()> {
+    async fn revoke_access_token(&self, _token: &str) -> Result<()> {
         // TODO: 实现令牌撤销
         Ok(())
     }
 
-    async fn save_refresh_token(&self, token: &OidcRefreshToken) -> Result<()> {
+    async fn save_refresh_token(&self, _token: &OidcRefreshToken) -> Result<()> {
         // TODO: 实现数据库保存
         Ok(())
     }
 
-    async fn get_refresh_token(&self, token: &str) -> Result<OidcRefreshToken> {
+    async fn get_refresh_token(&self, _token: &str) -> Result<OidcRefreshToken> {
         // TODO: 实现数据库查询
         Err(anyhow!("Not implemented"))
     }
 
-    async fn update_refresh_token(&self, token: &OidcRefreshToken) -> Result<()> {
+    async fn update_refresh_token(&self, _token: &OidcRefreshToken) -> Result<()> {
         // TODO: 实现数据库更新
         Ok(())
     }

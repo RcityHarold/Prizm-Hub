@@ -484,6 +484,18 @@ impl axum::response::IntoResponse for AuthError {
                 axum::http::StatusCode::FORBIDDEN,
                 msg.clone(),
             ),
+            AuthError::BadRequest(msg) => (
+                axum::http::StatusCode::BAD_REQUEST,
+                msg.clone(),
+            ),
+            AuthError::Unauthorized(msg) => (
+                axum::http::StatusCode::UNAUTHORIZED,
+                msg.clone(),
+            ),
+            AuthError::InternalServerError(msg) => (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                msg.clone(),
+            ),
         };
 
         let body = Json(serde_json::json!({

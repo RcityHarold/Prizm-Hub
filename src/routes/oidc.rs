@@ -3,12 +3,12 @@ use std::collections::HashMap;
 
 use axum::{
     extract::{Extension, Query, Form},
-    http::{StatusCode, HeaderMap, header},
-    response::{Html, Redirect, Json},
+    http::{HeaderMap, header},
+    response::{Redirect, Json},
     routing::{get, post},
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use serde_json::json;
 use base64::{Engine as _, engine::general_purpose};
 
@@ -16,7 +16,6 @@ use crate::{
     config::Config,
     models::{
         oidc_token::{TokenRequest, AuthorizeRequest, UserInfoResponse},
-        user::User,
     },
     services::{
         oidc::{OidcService, OidcConfiguration, JwksResponse},
@@ -90,7 +89,7 @@ async fn authorize(
                 let token = &auth_str[7..];
                 if let Ok(user) = get_user_from_token(token, &db).await {
                     // 用户已登录，生成授权码
-                    match oidc_service.create_authorization_code(&request, &user.id.unwrap()).await {
+                    match oidc_service.create_authorization_code(&request, &user.id.unwrap().id.to_string()).await {
                         Ok(code) => {
                             let mut redirect_url = format!("{}?code={}", request.redirect_uri, code);
                             if let Some(state) = request.state {

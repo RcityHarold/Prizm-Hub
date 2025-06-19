@@ -54,6 +54,7 @@ impl SsoSessionService {
         // 保存到数据库
         self.save_session(&sso_session).await?;
 
+        let is_active = !sso_session.is_expired();
         Ok(SsoSessionResponse {
             session_id,
             user_id: sso_session.user_id,
@@ -61,7 +62,7 @@ impl SsoSessionService {
             created_at: sso_session.created_at,
             last_accessed_at: sso_session.last_accessed_at,
             expires_at: sso_session.expires_at,
-            is_active: !sso_session.is_expired(),
+            is_active,
         })
     }
 
@@ -96,6 +97,7 @@ impl SsoSessionService {
         // 更新数据库
         self.update_session(&session).await?;
 
+        let is_active = !session.is_expired();
         Ok(SsoSessionResponse {
             session_id: session.session_id,
             user_id: session.user_id,
@@ -103,7 +105,7 @@ impl SsoSessionService {
             created_at: session.created_at,
             last_accessed_at: session.last_accessed_at,
             expires_at: session.expires_at,
-            is_active: !session.is_expired(),
+            is_active,
         })
     }
 
@@ -125,6 +127,8 @@ impl SsoSessionService {
             self.update_session(&session).await?;
         }
 
+        let is_expired = session.is_expired();
+        let client_sessions_empty = session.client_sessions.is_empty();
         Ok(SsoSessionResponse {
             session_id: session.session_id,
             user_id: session.user_id,
@@ -132,7 +136,7 @@ impl SsoSessionService {
             created_at: session.created_at,
             last_accessed_at: session.last_accessed_at,
             expires_at: session.expires_at,
-            is_active: !session.is_expired() && !session.client_sessions.is_empty(),
+            is_active: !is_expired && !client_sessions_empty,
         })
     }
 
@@ -190,14 +194,17 @@ impl SsoSessionService {
         
         Ok(sessions.into_iter()
             .filter(|s| !s.is_expired())
-            .map(|s| SsoSessionResponse {
-                session_id: s.session_id,
-                user_id: s.user_id,
-                client_sessions: s.client_sessions,
-                created_at: s.created_at,
-                last_accessed_at: s.last_accessed_at,
-                expires_at: s.expires_at,
-                is_active: !s.is_expired(),
+            .map(|s| {
+                let is_active = !s.is_expired();
+                SsoSessionResponse {
+                    session_id: s.session_id,
+                    user_id: s.user_id,
+                    client_sessions: s.client_sessions,
+                    created_at: s.created_at,
+                    last_accessed_at: s.last_accessed_at,
+                    expires_at: s.expires_at,
+                    is_active,
+                }
             })
             .collect())
     }
@@ -206,7 +213,7 @@ impl SsoSessionService {
     pub async fn logout_user_all_sessions(&self, user_id: &str) -> Result<i32> {
         let query = "DELETE FROM sso_session WHERE user_id = $user_id";
         
-        let result = self.db.client
+        let _result = self.db.client
             .query(query)
             .bind(("user_id", user_id))
             .await?;
@@ -224,7 +231,7 @@ impl SsoSessionService {
     pub async fn cleanup_expired_sessions(&self) -> Result<i32> {
         let query = "DELETE FROM sso_session WHERE expires_at < time::now()";
         
-        let result = self.db.client
+        let _result = self.db.client
             .query(query)
             .await?;
 
@@ -250,6 +257,7 @@ impl SsoSessionService {
 
         self.update_session(&session).await?;
 
+        let is_active = !session.is_expired();
         Ok(SsoSessionResponse {
             session_id: session.session_id,
             user_id: session.user_id,
@@ -257,7 +265,7 @@ impl SsoSessionService {
             created_at: session.created_at,
             last_accessed_at: session.last_accessed_at,
             expires_at: session.expires_at,
-            is_active: !session.is_expired(),
+            is_active,
         })
     }
 

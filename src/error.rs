@@ -60,6 +60,15 @@ pub enum AuthError {
     
     #[error("Forbidden: {0}")]
     Forbidden(String),
+    
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+    
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+    
+    #[error("Internal server error: {0}")]
+    InternalServerError(String),
 }
 
 impl From<reqwest::Error> for AuthError {

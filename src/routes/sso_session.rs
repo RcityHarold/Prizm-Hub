@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use axum::{
-    extract::{Extension, Path, Query},
+    extract::{Extension, Path},
     http::StatusCode,
     response::Json,
     routing::{get, post, delete},
@@ -64,6 +64,7 @@ async fn get_session(
 ) -> Result<Json<SsoSessionResponse>, AuthError> {
     match session_service.get_session(&session_id).await {
         Ok(session) => {
+            let is_active = !session.is_expired();
             let response = SsoSessionResponse {
                 session_id: session.session_id,
                 user_id: session.user_id,
@@ -71,7 +72,7 @@ async fn get_session(
                 created_at: session.created_at,
                 last_accessed_at: session.last_accessed_at,
                 expires_at: session.expires_at,
-                is_active: !session.is_expired(),
+                is_active,
             };
             Ok(Json(response))
         }
