@@ -61,7 +61,26 @@
 - 时效性密码重置令牌
 - 安全的JWT密钥管理
 
-### 最新更新 (监控审计系统完成版本) 🎉
+### 🔐 OIDC 单点登录 (SSO) 🆕
+- **OIDC 协议支持**: 完整的 OpenID Connect 1.0 协议实现
+- **单点登录**: 支持跨应用的无缝身份验证
+- **授权码流程**: 标准的 OAuth 2.0 授权码流程
+- **PKCE 支持**: 代码质询防止授权码拦截攻击
+- **JWT ID Token**: 标准的身份令牌生成和验证
+- **多客户端支持**: 支持 Web、移动、SPA 等不同类型客户端
+- **会话管理**: 完整的 SSO 会话生命周期管理
+- **单点登出**: 支持全局和单应用登出
+- **Discovery 端点**: 标准的 OIDC 发现和配置端点
+
+### 最新更新 (OIDC SSO 系统完成版本) 🎉
+- 🔐 **OIDC 单点登录完成**: 完整的企业级 SSO 解决方案（第五阶段已完成）
+  - ✅ **OIDC 核心协议**: 完整的 OpenID Connect 1.0 实现
+  - ✅ **标准端点**: Discovery、授权、令牌、用户信息、登出端点
+  - ✅ **授权码流程**: 支持 PKCE 的安全授权码流程
+  - ✅ **令牌管理**: 访问令牌、刷新令牌、ID 令牌完整生命周期
+  - ✅ **客户端管理**: 多类型客户端注册、配置、密钥管理
+  - ✅ **SSO 会话**: 跨应用会话同步、单点登出、会话统计
+  - ✅ **安全特性**: PKCE、作用域控制、客户端认证、签名验证
 - 📊 **监控审计系统完成**: 全面的安全监控和审计体系（第四阶段已完成）
   - ✅ **安全仪表板**: 实时安全指标概览和趋势分析
   - ✅ **审计日志分析**: 用户活动分类统计和行为分析
@@ -99,7 +118,7 @@
 - ✨ **新功能**: 真正的会话管理系统（登出、会话列表、批量登出）
 - 🔧 **修复**: 邮箱验证逻辑优化（注册后强制验证才能登录）
 - 🔧 **修复**: OAuth 用户记录处理改进
-- 📊 **数据库**: 新增 password_reset_token、session、user_mfa、account_lockout、role、permission、user_role、role_permission、user_profile、user_preferences、user_activity 表
+- 📊 **数据库**: 新增 password_reset_token、session、user_mfa、account_lockout、role、permission、user_role、role_permission、user_profile、user_preferences、user_activity、oidc_client、oidc_authorization_code、oidc_access_token、oidc_refresh_token、sso_session 表
 - 📊 **监控审计**: 完整的审计API端点集，支持安全仪表板、指标分析、系统健康监控和安全报告生成
 
 ## 技术栈
@@ -383,6 +402,98 @@ DEFINE TABLE user_activity SCHEMAFULL;
 - status: string - 状态（Success、Failed、Warning、Info）
 - timestamp: number - 时间戳
 
+### OIDC 客户端表 (oidc_client)
+```sql
+DEFINE TABLE oidc_client SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 客户端唯一标识符
+- client_id: string - 客户端ID（唯一）
+- client_secret_hash: string - 客户端密钥哈希
+- client_name: string - 客户端名称
+- client_type: string - 客户端类型（public/confidential）
+- redirect_uris: array - 重定向URI列表
+- post_logout_redirect_uris: array - 登出后重定向URI列表
+- allowed_scopes: array - 允许的作用域列表
+- allowed_grant_types: array - 允许的授权类型
+- allowed_response_types: array - 允许的响应类型
+- require_pkce: bool - 是否要求PKCE
+- access_token_lifetime: number - 访问令牌生命周期（秒）
+- refresh_token_lifetime: number - 刷新令牌生命周期（秒）
+- id_token_lifetime: number - ID令牌生命周期（秒）
+- is_active: bool - 是否活跃
+- created_by: record(user) - 创建者
+- created_at: number - 创建时间戳
+- updated_at: number - 更新时间戳
+
+### OIDC 授权码表 (oidc_authorization_code)
+```sql
+DEFINE TABLE oidc_authorization_code SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 授权码唯一标识符
+- code: string - 授权码（唯一）
+- client_id: string - 客户端ID
+- user_id: record(user) - 用户ID
+- redirect_uri: string - 重定向URI
+- scope: string - 作用域
+- state: string - 状态参数
+- nonce: string - 随机数
+- code_challenge: string - PKCE代码质询
+- code_challenge_method: string - PKCE质询方法
+- used: bool - 是否已使用
+- expires_at: number - 过期时间戳
+- created_at: number - 创建时间戳
+
+### OIDC 访问令牌表 (oidc_access_token)
+```sql
+DEFINE TABLE oidc_access_token SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 令牌唯一标识符
+- token: string - 访问令牌（唯一）
+- token_type: string - 令牌类型（Bearer）
+- client_id: string - 客户端ID
+- user_id: record(user) - 用户ID
+- scope: string - 作用域
+- expires_at: number - 过期时间戳
+- created_at: number - 创建时间戳
+
+### OIDC 刷新令牌表 (oidc_refresh_token)
+```sql
+DEFINE TABLE oidc_refresh_token SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 令牌唯一标识符
+- token: string - 刷新令牌（唯一）
+- client_id: string - 客户端ID
+- user_id: record(user) - 用户ID
+- access_token: string - 关联的访问令牌
+- scope: string - 作用域
+- used: bool - 是否已使用
+- expires_at: number - 过期时间戳
+- created_at: number - 创建时间戳
+
+### SSO 会话表 (sso_session)
+```sql
+DEFINE TABLE sso_session SCHEMAFULL;
+```
+
+字段:
+- id: Thing - 会话唯一标识符
+- session_id: string - 会话ID（唯一）
+- user_id: record(user) - 用户ID
+- client_sessions: array - 客户端会话列表
+- created_at: number - 创建时间戳
+- last_accessed_at: number - 最后访问时间戳
+- expires_at: number - 过期时间戳
+- ip_address: string - IP地址
+- user_agent: string - 用户代理
+
 ## API 端点
 
 ### 用户认证
@@ -475,6 +586,37 @@ DEFINE TABLE user_activity SCHEMAFULL;
 - `GET /api/users/users/:user_id/profile` - 查看指定用户档案（需要users.read权限）
 - `GET /api/users/users/:user_id/preferences` - 查看指定用户偏好（需要users.read权限）
 - `GET /api/users/users/:user_id/activity-log` - 查看指定用户活动日志（需要audit.read权限）
+
+### OIDC 单点登录 🔐
+
+#### OIDC 核心端点
+- `GET /.well-known/openid-configuration` - OIDC Discovery 端点
+- `GET /api/oidc/jwks` - JSON Web Key Set 端点
+- `GET /api/oidc/authorize` - 授权端点（支持授权码流程）
+- `POST /api/oidc/token` - 令牌端点（授权码交换、刷新令牌）
+- `GET /api/oidc/userinfo` - 用户信息端点
+- `GET /api/oidc/logout` - 单点登出端点
+
+#### OIDC 客户端管理
+- `POST /api/oidc/clients` - 创建OIDC客户端
+- `GET /api/oidc/clients` - 获取客户端列表（支持分页）
+- `GET /api/oidc/clients/:client_id` - 获取客户端详情
+- `PUT /api/oidc/clients/:client_id` - 更新客户端配置
+- `DELETE /api/oidc/clients/:client_id` - 禁用客户端
+- `POST /api/oidc/clients/:client_id/regenerate-secret` - 重新生成客户端密钥
+
+#### SSO 会话管理
+- `POST /api/sso/sessions` - 创建SSO会话
+- `GET /api/sso/sessions/:session_id` - 获取SSO会话信息
+- `DELETE /api/sso/sessions/:session_id` - 终止SSO会话
+- `POST /api/sso/sessions/:session_id/clients/:client_id` - 添加客户端会话
+- `DELETE /api/sso/sessions/:session_id/clients/:client_id` - 移除客户端会话（单点登出）
+- `POST /api/sso/sessions/:session_id/extend` - 延长会话时间
+- `GET /api/sso/users/:user_id/sessions` - 获取用户所有SSO会话
+- `DELETE /api/sso/users/:user_id/sessions` - 终止用户所有SSO会话
+- `GET /api/sso/users/:user_id/sessions/stats` - 获取用户会话统计
+- `GET /api/sso/sessions/stats` - 获取全局会话统计
+- `POST /api/sso/sessions/cleanup` - 清理过期会话
 
 ## API 示例
 
@@ -1276,6 +1418,175 @@ curl "http://localhost:8080/api/users/users?page=1&limit=10&status=Active&search
 }
 ```
 
+### OIDC 单点登录示例
+
+#### OIDC Discovery 配置
+```bash
+# 请求
+curl http://localhost:8080/.well-known/openid-configuration
+
+# 成功响应 (200 OK)
+{
+  "issuer": "http://localhost:8080",
+  "authorization_endpoint": "http://localhost:8080/api/oidc/authorize",
+  "token_endpoint": "http://localhost:8080/api/oidc/token",
+  "userinfo_endpoint": "http://localhost:8080/api/oidc/userinfo",
+  "jwks_uri": "http://localhost:8080/api/oidc/jwks",
+  "end_session_endpoint": "http://localhost:8080/api/oidc/logout",
+  "response_types_supported": ["code", "id_token"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "subject_types_supported": ["public"],
+  "id_token_signing_alg_values_supported": ["HS256"],
+  "scopes_supported": ["openid", "profile", "email"],
+  "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+  "code_challenge_methods_supported": ["S256", "plain"]
+}
+```
+
+#### 创建 OIDC 客户端
+```bash
+# 请求
+curl -X POST http://localhost:8080/api/oidc/clients \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_name": "My Web App",
+    "client_type": "confidential",
+    "redirect_uris": ["https://myapp.com/callback"],
+    "post_logout_redirect_uris": ["https://myapp.com/logout"],
+    "allowed_scopes": ["openid", "profile", "email"],
+    "require_pkce": true
+  }'
+
+# 成功响应 (200 OK)
+{
+  "client_id": "client_1634567890abc123def",
+  "client_secret": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6A7B8C9D0E1F2G3",
+  "client_name": "My Web App",
+  "client_type": "confidential",
+  "redirect_uris": ["https://myapp.com/callback"],
+  "post_logout_redirect_uris": ["https://myapp.com/logout"],
+  "allowed_scopes": ["openid", "profile", "email"],
+  "allowed_grant_types": ["authorization_code", "refresh_token"],
+  "allowed_response_types": ["code"],
+  "require_pkce": true,
+  "access_token_lifetime": 3600,
+  "refresh_token_lifetime": 86400,
+  "id_token_lifetime": 3600,
+  "is_active": true,
+  "created_at": "2025-04-07T15:30:00Z",
+  "updated_at": "2025-04-07T15:30:00Z"
+}
+```
+
+#### OIDC 授权流程
+```bash
+# 步骤1: 重定向到授权端点
+# 浏览器访问：
+https://localhost:8080/api/oidc/authorize?response_type=code&client_id=client_123&redirect_uri=https://myapp.com/callback&scope=openid%20profile%20email&state=xyz123&nonce=abc456&code_challenge=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk&code_challenge_method=S256
+
+# 用户登录后重定向回调：
+https://myapp.com/callback?code=auth_code_abc123&state=xyz123
+
+# 步骤2: 交换授权码获取令牌
+curl -X POST http://localhost:8080/api/oidc/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d 'grant_type=authorization_code&code=auth_code_abc123&redirect_uri=https://myapp.com/callback&client_id=client_123&client_secret=client_secret_here&code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
+
+# 成功响应 (200 OK)
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "def456ghi789jkl012mno345pqr678stu901vwx234yz",
+  "id_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "scope": "openid profile email"
+}
+
+# 步骤3: 获取用户信息
+curl http://localhost:8080/api/oidc/userinfo \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# 成功响应 (200 OK)
+{
+  "sub": "user_xyz789",
+  "email": "user@example.com",
+  "email_verified": true,
+  "name": "张三",
+  "preferred_username": "user@example.com",
+  "updated_at": 1701234567
+}
+```
+
+#### 刷新令牌
+```bash
+# 请求
+curl -X POST http://localhost:8080/api/oidc/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d 'grant_type=refresh_token&refresh_token=def456ghi789jkl012mno345pqr678stu901vwx234yz&client_id=client_123&client_secret=client_secret_here'
+
+# 成功响应 (200 OK)
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "new_refresh_token_here",
+  "scope": "openid profile email"
+}
+```
+
+#### 单点登出
+```bash
+# 请求
+curl "http://localhost:8080/api/oidc/logout?post_logout_redirect_uri=https://myapp.com/logout&id_token_hint=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...&state=logout_state_123"
+
+# 重定向到：
+https://myapp.com/logout?state=logout_state_123
+```
+
+#### SSO 会话管理示例
+```bash
+# 创建 SSO 会话
+curl -X POST http://localhost:8080/api/sso/sessions \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user_xyz789",
+    "client_id": "client_123",
+    "ip_address": "192.168.1.100",
+    "user_agent": "Mozilla/5.0..."
+  }'
+
+# 成功响应 (200 OK)
+{
+  "session_id": "sso_session_abc123",
+  "user_id": "user_xyz789",
+  "client_sessions": [
+    {
+      "client_id": "client_123",
+      "session_id": "client_session_def456",
+      "created_at": 1701234567,
+      "last_accessed_at": 1701234567
+    }
+  ],
+  "created_at": 1701234567,
+  "last_accessed_at": 1701234567,
+  "expires_at": 1701263367,
+  "is_active": true
+}
+
+# 获取用户会话统计
+curl http://localhost:8080/api/sso/users/user_xyz789/sessions/stats \
+  -H "Authorization: Bearer admin-jwt-token"
+
+# 成功响应 (200 OK)
+{
+  "total_sessions": 2,
+  "active_clients": 3,
+  "last_activity": 1701234567
+}
+```
+
 ### 安全状态检查示例
 
 #### 检查账户锁定状态
@@ -1447,14 +1758,24 @@ curl http://localhost:8080/api/auth/security/lockout-status \
 - [x] **性能指标**: 认证成功率、锁定统计、速率限制违规 ✅
 - [x] **风险评估**: 自动风险级别计算和安全建议 ✅
 
+### 🎉 第五阶段：OIDC 单点登录 ✅ (已完成)
+- [x] **OIDC 核心协议**: 完整的 OpenID Connect 1.0 实现
+- [x] **标准端点**: Discovery、授权、令牌、用户信息、登出端点
+- [x] **授权码流程**: 支持 PKCE 的安全授权码流程
+- [x] **令牌管理**: 访问令牌、刷新令牌、ID 令牌完整生命周期
+- [x] **客户端管理**: 多类型客户端注册、配置、密钥管理
+- [x] **SSO 会话**: 跨应用会话同步、单点登出、会话统计
+- [x] **安全特性**: PKCE、作用域控制、客户端认证、签名验证
+- [x] **兼容性**: 与主流 OIDC 客户端和库完全兼容
+
 ### 📋 未来增强功能
 - [x] **设备指纹识别**: 基础IP和设备信息追踪 ✅
+- [x] **SSO单点登录支持**: 完整的 OIDC 实现 ✅
 - [ ] 添加更多OAuth提供商支持 (Apple, Microsoft, Twitter等)
 - [ ] 实现账号关联功能（多个OAuth账号关联）
 - [ ] 密码复杂度策略和安全建议
 - [ ] 高级设备指纹识别和异常检测
 - [ ] API密钥管理
-- [ ] SSO单点登录支持
 - [ ] SAML协议支持
 
 ## ⚠️ 重要安全注意事项

@@ -21,6 +21,9 @@ use crate::{
         database::Database, 
         rate_limiter::{RateLimiter, RateLimitRules},
         account_lockout::AccountLockoutService,
+        oidc::OidcService,
+        oidc_client_management::OidcClientService,
+        sso_session_management::SsoSessionService,
     },
 };
 
@@ -68,15 +71,22 @@ async fn main() -> anyhow::Result<()> {
     // 创建账户锁定服务
     let lockout_service = Arc::new(AccountLockoutService::new(shared_db.clone(), config.clone())?);
 
+    // 创建 OIDC 服务
+    let oidc_service = Arc::new(OidcService::new(shared_db.clone(), config.clone())?);
+    let oidc_client_service = Arc::new(OidcClientService::new(shared_db.clone()));
+    let sso_session_service = Arc::new(SsoSessionService::new(shared_db.clone()));
+
     // 启动定期清理任务
     let cleanup_limiter = rate_limiter.clone();
     let cleanup_lockout = lockout_service.clone();
+    let cleanup_sso = sso_session_service.clone();
     tokio::spawn(async move {
         let mut interval = interval(Duration::from_secs(3600)); // 每小时清理一次
         loop {
             interval.tick().await;
             cleanup_limiter.cleanup_expired_records().await;
             let _ = cleanup_lockout.cleanup_expired_lockouts().await;
+            let _ = cleanup_sso.cleanup_expired_sessions().await;
         }
     });
 
@@ -94,9 +104,16 @@ async fn main() -> anyhow::Result<()> {
         .nest("/api/rbac", routes::rbac::router())
         .nest("/api/users", routes::user_management::router())
         .nest("/api/audit", routes::audit::audit_routes())
+        .nest("/api/oidc", routes::oidc::oidc_routes())
+        .nest("/api/oidc", routes::oidc_client::oidc_client_routes())
+        .nest("/api/sso", routes::sso_session::sso_session_routes())
+        .nest("", routes::oidc::oidc_routes()) // 为 /.well-known 路径
         .layer(Extension(shared_db))
         .layer(Extension(Arc::new(app_state)))
         .layer(Extension(config.clone()))  // 添加 Config 扩展
+        .layer(Extension(oidc_service))     // 添加 OIDC 服务扩展
+        .layer(Extension(oidc_client_service)) // 添加 OIDC 客户端服务扩展
+        .layer(Extension(sso_session_service)) // 添加 SSO 会话服务扩展
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)

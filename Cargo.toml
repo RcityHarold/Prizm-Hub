@@ -46,6 +46,13 @@ validator = { version = "0.16", features = ["derive"] }
 async-trait = "0.1"
 dotenv = "0.15"
 
+# 加密和哈希
+sha2 = "0.10"
+
+# URL 编码
+urlencoding = "2.1"
+serde_urlencoded = "0.7"
+
 # 邮件发送
 lettre = { version = "0.10", features = ["builder", "smtp-transport", "tokio1-native-tls"] }
 

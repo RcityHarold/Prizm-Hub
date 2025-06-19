@@ -10,3 +10,6 @@ pub mod user_role;
 pub mod user_profile;
 pub mod user_preferences;
 pub mod user_activity;
+pub mod oidc_client;
+pub mod oidc_token;
+pub mod sso_session;

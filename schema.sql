@@ -161,3 +161,84 @@ DEFINE FIELD timestamp ON user_activity TYPE number;
 DEFINE INDEX user_activity_user_idx ON user_activity COLUMNS user_id;
 DEFINE INDEX user_activity_timestamp_idx ON user_activity COLUMNS timestamp;
 DEFINE INDEX user_activity_category_idx ON user_activity COLUMNS category;
+
+-- ===============================
+-- OIDC SSO 相关表结构
+-- ===============================
+
+-- OIDC 客户端应用表
+DEFINE TABLE oidc_client SCHEMAFULL;
+DEFINE FIELD client_id ON oidc_client TYPE string;
+DEFINE FIELD client_secret_hash ON oidc_client TYPE string;
+DEFINE FIELD client_name ON oidc_client TYPE string;
+DEFINE FIELD client_type ON oidc_client TYPE string; -- public, confidential
+DEFINE FIELD redirect_uris ON oidc_client TYPE array;
+DEFINE FIELD post_logout_redirect_uris ON oidc_client TYPE array;
+DEFINE FIELD allowed_scopes ON oidc_client TYPE array;
+DEFINE FIELD allowed_grant_types ON oidc_client TYPE array;
+DEFINE FIELD allowed_response_types ON oidc_client TYPE array;
+DEFINE FIELD require_pkce ON oidc_client TYPE bool DEFAULT true;
+DEFINE FIELD access_token_lifetime ON oidc_client TYPE number DEFAULT 3600; -- 1小时
+DEFINE FIELD refresh_token_lifetime ON oidc_client TYPE number DEFAULT 86400; -- 24小时
+DEFINE FIELD id_token_lifetime ON oidc_client TYPE number DEFAULT 3600; -- 1小时
+DEFINE FIELD is_active ON oidc_client TYPE bool DEFAULT true;
+DEFINE FIELD created_by ON oidc_client TYPE record(user);
+DEFINE FIELD created_at ON oidc_client TYPE number;
+DEFINE FIELD updated_at ON oidc_client TYPE number;
+DEFINE INDEX oidc_client_id_idx ON oidc_client COLUMNS client_id UNIQUE;
+
+-- OIDC 授权码表
+DEFINE TABLE oidc_authorization_code SCHEMAFULL;
+DEFINE FIELD code ON oidc_authorization_code TYPE string;
+DEFINE FIELD client_id ON oidc_authorization_code TYPE string;
+DEFINE FIELD user_id ON oidc_authorization_code TYPE record(user);
+DEFINE FIELD redirect_uri ON oidc_authorization_code TYPE string;
+DEFINE FIELD scope ON oidc_authorization_code TYPE string;
+DEFINE FIELD state ON oidc_authorization_code TYPE option<string>;
+DEFINE FIELD nonce ON oidc_authorization_code TYPE option<string>;
+DEFINE FIELD code_challenge ON oidc_authorization_code TYPE option<string>;
+DEFINE FIELD code_challenge_method ON oidc_authorization_code TYPE option<string>;
+DEFINE FIELD used ON oidc_authorization_code TYPE bool DEFAULT false;
+DEFINE FIELD expires_at ON oidc_authorization_code TYPE number;
+DEFINE FIELD created_at ON oidc_authorization_code TYPE number;
+DEFINE INDEX oidc_auth_code_idx ON oidc_authorization_code COLUMNS code UNIQUE;
+DEFINE INDEX oidc_auth_code_expiry_idx ON oidc_authorization_code COLUMNS expires_at;
+
+-- OIDC 访问令牌表
+DEFINE TABLE oidc_access_token SCHEMAFULL;
+DEFINE FIELD token ON oidc_access_token TYPE string;
+DEFINE FIELD token_type ON oidc_access_token TYPE string DEFAULT "Bearer";
+DEFINE FIELD client_id ON oidc_access_token TYPE string;
+DEFINE FIELD user_id ON oidc_access_token TYPE record(user);
+DEFINE FIELD scope ON oidc_access_token TYPE string;
+DEFINE FIELD expires_at ON oidc_access_token TYPE number;
+DEFINE FIELD created_at ON oidc_access_token TYPE number;
+DEFINE INDEX oidc_access_token_idx ON oidc_access_token COLUMNS token UNIQUE;
+DEFINE INDEX oidc_access_token_expiry_idx ON oidc_access_token COLUMNS expires_at;
+
+-- OIDC 刷新令牌表
+DEFINE TABLE oidc_refresh_token SCHEMAFULL;
+DEFINE FIELD token ON oidc_refresh_token TYPE string;
+DEFINE FIELD client_id ON oidc_refresh_token TYPE string;
+DEFINE FIELD user_id ON oidc_refresh_token TYPE record(user);
+DEFINE FIELD access_token ON oidc_refresh_token TYPE string; -- 关联的访问令牌
+DEFINE FIELD scope ON oidc_refresh_token TYPE string;
+DEFINE FIELD used ON oidc_refresh_token TYPE bool DEFAULT false;
+DEFINE FIELD expires_at ON oidc_refresh_token TYPE number;
+DEFINE FIELD created_at ON oidc_refresh_token TYPE number;
+DEFINE INDEX oidc_refresh_token_idx ON oidc_refresh_token COLUMNS token UNIQUE;
+DEFINE INDEX oidc_refresh_token_expiry_idx ON oidc_refresh_token COLUMNS expires_at;
+
+-- SSO 会话表
+DEFINE TABLE sso_session SCHEMAFULL;
+DEFINE FIELD session_id ON sso_session TYPE string;
+DEFINE FIELD user_id ON sso_session TYPE record(user);
+DEFINE FIELD client_sessions ON sso_session TYPE array; -- 客户端会话列表
+DEFINE FIELD created_at ON sso_session TYPE number;
+DEFINE FIELD last_accessed_at ON sso_session TYPE number;
+DEFINE FIELD expires_at ON sso_session TYPE number;
+DEFINE FIELD ip_address ON sso_session TYPE string;
+DEFINE FIELD user_agent ON sso_session TYPE string;
+DEFINE INDEX sso_session_id_idx ON sso_session COLUMNS session_id UNIQUE;
+DEFINE INDEX sso_session_user_idx ON sso_session COLUMNS user_id;
+DEFINE INDEX sso_session_expiry_idx ON sso_session COLUMNS expires_at;
