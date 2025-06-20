@@ -40,6 +40,22 @@ surreal import --conn http://localhost:8000 --user root --pass root --ns product
 - 系统用户账户（用于权限分配的内部账户）
 - 角色权限关联（为系统角色分配适当的权限）
 
+### 3. 安装文档系统权限（可选）
+
+如果需要集成 Rainbow-Docs 文档系统，请运行额外的权限扩展文件：
+
+```bash
+# 导入文档系统权限
+surreal import --conn http://localhost:8000 --user root --pass root --ns production --db auth docs_permissions.sql
+
+# 或者手动执行SQL文件内容
+```
+
+**`docs_permissions.sql` 包含的内容**：
+- 文档管理权限（10个文档相关权限）
+- 文档系统角色（3个文档专用角色）
+- 权限关联（为现有角色分配文档权限）
+
 ## 权限系统说明
 
 ### 系统角色
@@ -68,6 +84,31 @@ surreal import --conn http://localhost:8000 --user root --pass root --ns product
 | `security.read` | security | read | 查看安全状态 |
 | `security.write` | security | write | 管理安全操作 |
 | `audit.read` | audit | read | 查看审计日志 |
+
+### 文档系统权限（可选）
+
+如果安装了文档系统权限扩展，还包含以下权限：
+
+| 权限名 | 资源 | 操作 | 描述 |
+|--------|------|------|------|
+| `docs.read` | documents | read | 查看和阅读文档内容 |
+| `docs.write` | documents | write | 创建、编辑和发布文档 |
+| `docs.delete` | documents | delete | 删除文档和章节 |
+| `docs.admin` | documents | admin | 管理文档空间、权限和设置 |
+| `spaces.read` | spaces | read | 查看和访问文档空间 |
+| `spaces.write` | spaces | write | 创建、编辑文档空间和设置 |
+| `spaces.delete` | spaces | delete | 删除文档空间 |
+| `comments.read` | comments | read | 查看文档评论和讨论 |
+| `comments.write` | comments | write | 添加、编辑和回复评论 |
+| `comments.delete` | comments | delete | 删除评论和讨论 |
+
+### 文档系统角色（可选）
+
+| 角色名 | 显示名称 | 描述 | 权限范围 |
+|--------|----------|------|----------|
+| `docs_admin` | 文档管理员 | 拥有完整文档管理权限 | 所有文档权限 |
+| `docs_editor` | 文档编辑员 | 可以创建和编辑文档 | docs.read, docs.write, comments |
+| `docs_reader` | 文档阅读者 | 只能查看文档 | docs.read, spaces.read, comments.read |
 
 ## 应用程序部署
 
