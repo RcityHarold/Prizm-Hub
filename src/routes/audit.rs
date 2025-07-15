@@ -614,7 +614,7 @@ async fn check_database_health(db: &Database) -> ApiResult<DatabaseHealth> {
     let start = std::time::Instant::now();
     
     // Simple health check
-    let query = "SELECT VALUE 1";
+    let query = "INFO FOR DB";
     let result = db.client.query(query).await;
     
     let response_time_ms = start.elapsed().as_millis() as i64;

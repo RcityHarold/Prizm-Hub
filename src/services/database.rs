@@ -58,7 +58,7 @@ impl Database {
         .map_err(|e| AuthError::DatabaseError(format!("Failed to authenticate: {}", e)))?;
         
         debug!("Selecting namespace and database");
-        client.use_ns("test").use_db("test").await
+        client.use_ns(&config.database_namespace).use_db(&config.database_name).await
             .map_err(|e| AuthError::DatabaseError(format!("Failed to select namespace/database: {}", e)))?;
         
         debug!("Database connection established successfully");
@@ -68,8 +68,8 @@ impl Database {
     /// 验证数据库连接
     /// 注意：数据库schema应该通过schema.sql文件手动创建
     pub async fn verify_connection(&self) -> Result<()> {
-        // 简单的连接验证查询
-        let query = "SELECT VALUE 1";
+        // 使用 INFO 查询验证数据库连接
+        let query = "INFO FOR DB";
         self.client.query(query).await
             .map_err(|e| AuthError::DatabaseError(format!("Database connection failed: {}", e)))?;
         

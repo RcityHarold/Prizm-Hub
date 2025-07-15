@@ -10,8 +10,8 @@ CREATE permission:docs_read CONTENT {
     resource: "documents",
     action: "read",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 CREATE permission:docs_write CONTENT {
@@ -21,8 +21,8 @@ CREATE permission:docs_write CONTENT {
     resource: "documents",
     action: "write",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 CREATE permission:docs_delete CONTENT {
@@ -32,8 +32,8 @@ CREATE permission:docs_delete CONTENT {
     resource: "documents",
     action: "delete",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 CREATE permission:docs_admin CONTENT {
@@ -43,8 +43,8 @@ CREATE permission:docs_admin CONTENT {
     resource: "documents",
     action: "admin",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 -- 文档空间权限
@@ -55,8 +55,8 @@ CREATE permission:spaces_read CONTENT {
     resource: "spaces",
     action: "read",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 CREATE permission:spaces_write CONTENT {
@@ -66,8 +66,8 @@ CREATE permission:spaces_write CONTENT {
     resource: "spaces",
     action: "write",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 CREATE permission:spaces_delete CONTENT {
@@ -77,8 +77,8 @@ CREATE permission:spaces_delete CONTENT {
     resource: "spaces",
     action: "delete",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 -- 文档评论权限
@@ -89,8 +89,8 @@ CREATE permission:comments_read CONTENT {
     resource: "comments",
     action: "read",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 CREATE permission:comments_write CONTENT {
@@ -100,8 +100,8 @@ CREATE permission:comments_write CONTENT {
     resource: "comments",
     action: "write",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 CREATE permission:comments_delete CONTENT {
@@ -111,8 +111,8 @@ CREATE permission:comments_delete CONTENT {
     resource: "comments",
     action: "delete",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 -- 创建文档管理员角色
@@ -121,8 +121,8 @@ CREATE role:docs_admin CONTENT {
     display_name: "文档管理员",
     description: "拥有完整文档管理权限的管理员",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 -- 创建文档编辑员角色
@@ -131,8 +131,8 @@ CREATE role:docs_editor CONTENT {
     display_name: "文档编辑员",
     description: "可以创建和编辑文档的角色",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 -- 创建文档阅读者角色
@@ -141,78 +141,78 @@ CREATE role:docs_reader CONTENT {
     display_name: "文档阅读者",
     description: "只能查看文档的角色",
     is_system: true,
-    created_at: time::now(),
-    updated_at: time::now()
+    created_at: time::unix(),
+    updated_at: time::unix()
 };
 
 -- 为 admin 角色添加所有文档权限
 CREATE role_permission CONTENT {
     role_id: role:admin,
     permission_id: permission:docs_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:admin,
     permission_id: permission:docs_write,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:admin,
     permission_id: permission:docs_delete,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:admin,
     permission_id: permission:docs_admin,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:admin,
     permission_id: permission:spaces_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:admin,
     permission_id: permission:spaces_write,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:admin,
     permission_id: permission:spaces_delete,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:admin,
     permission_id: permission:comments_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:admin,
     permission_id: permission:comments_write,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:admin,
     permission_id: permission:comments_delete,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
@@ -220,70 +220,70 @@ CREATE role_permission CONTENT {
 CREATE role_permission CONTENT {
     role_id: role:docs_admin,
     permission_id: permission:docs_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_admin,
     permission_id: permission:docs_write,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_admin,
     permission_id: permission:docs_delete,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_admin,
     permission_id: permission:docs_admin,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_admin,
     permission_id: permission:spaces_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_admin,
     permission_id: permission:spaces_write,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_admin,
     permission_id: permission:spaces_delete,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_admin,
     permission_id: permission:comments_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_admin,
     permission_id: permission:comments_write,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_admin,
     permission_id: permission:comments_delete,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
@@ -291,35 +291,35 @@ CREATE role_permission CONTENT {
 CREATE role_permission CONTENT {
     role_id: role:docs_editor,
     permission_id: permission:docs_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_editor,
     permission_id: permission:docs_write,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_editor,
     permission_id: permission:spaces_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_editor,
     permission_id: permission:comments_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_editor,
     permission_id: permission:comments_write,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
@@ -327,21 +327,21 @@ CREATE role_permission CONTENT {
 CREATE role_permission CONTENT {
     role_id: role:docs_reader,
     permission_id: permission:docs_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_reader,
     permission_id: permission:spaces_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:docs_reader,
     permission_id: permission:comments_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
@@ -349,20 +349,20 @@ CREATE role_permission CONTENT {
 CREATE role_permission CONTENT {
     role_id: role:user,
     permission_id: permission:docs_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:user,
     permission_id: permission:spaces_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };
 
 CREATE role_permission CONTENT {
     role_id: role:user,
     permission_id: permission:comments_read,
-    granted_at: time::now(),
+    granted_at: time::unix(),
     granted_by: user:system
 };

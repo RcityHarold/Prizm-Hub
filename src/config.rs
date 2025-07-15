@@ -6,6 +6,8 @@ pub struct Config {
     pub database_url: String,
     pub database_user: String,
     pub database_pass: String,
+    pub database_namespace: String,
+    pub database_name: String,
     pub database_connection_timeout: u64,
     pub database_max_connections: u32,
     pub jwt_secret: String,
@@ -36,6 +38,10 @@ impl Config {
                 .unwrap_or_else(|_| "root".to_string()),
             database_pass: env::var("DATABASE_PASS")
                 .unwrap_or_else(|_| "root".to_string()),
+            database_namespace: env::var("DATABASE_NAMESPACE")
+                .unwrap_or_else(|_| "auth".to_string()),
+            database_name: env::var("DATABASE_NAME")
+                .unwrap_or_else(|_| "main".to_string()),
             database_connection_timeout: env::var("DATABASE_CONNECTION_TIMEOUT")
                 .unwrap_or_else(|_| "30".to_string())
                 .parse()
