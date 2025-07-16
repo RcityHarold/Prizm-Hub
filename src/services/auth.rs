@@ -226,7 +226,7 @@ impl AuthService {
             is_email_verified: false,
             verification_token: Some(verification_token.clone()),
             account_status: crate::models::user::AccountStatus::Active,
-            last_login_at: None,
+            last_login_at: 0,
             last_login_ip: None,
         };
 

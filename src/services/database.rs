@@ -106,17 +106,22 @@ impl Database {
             format!("SELECT * FROM {} WHERE {} = $value", table, field)
         };
 
+        debug!("执行查询: {}", query);
+        debug!("查询参数: value = {}", value);
+        
         let mut result = self.client
             .query(&query)
             .bind(("value", value))
             .await
             .map_err(|e| AuthError::DatabaseError(format!("Failed to execute query: {}", e)))?;
         
+        debug!("原始查询结果: {:?}", result);
+        
         let records: Vec<T> = result
             .take(0)
             .map_err(|e| AuthError::DatabaseError(format!("Failed to parse records: {}", e)))?;
             
-        dbg!(&records);
+        debug!("解析后的记录: {:?}", records);
         Ok(records.into_iter().next())
     }
 
