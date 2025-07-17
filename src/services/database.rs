@@ -135,7 +135,7 @@ impl Database {
             .update(thing.clone())
             .content(record)
             .await
-            .map_err(|_| AuthError::DatabaseError("Failed to update record".into()))?;
+            .map_err(|e| AuthError::DatabaseError(format!("Failed to update record: {}", e)))?;
             
         updated.ok_or_else(|| AuthError::DatabaseError("Record not found".into()))
     }
@@ -169,9 +169,14 @@ impl Database {
 
     pub async fn delete_sessions_by_user_id(&self, user_id: &str) -> Result<()> {
         let query = "DELETE session WHERE user_id = type::thing($user_id)";
+        let user_thing_str = if user_id.starts_with("user:") {
+            user_id.to_string()
+        } else {
+            format!("user:{}", user_id)
+        };
         self.client
             .query(query)
-            .bind(("user_id", format!("user:{}", user_id)))
+            .bind(("user_id", user_thing_str))
             .await
             .map_err(|e| AuthError::DatabaseError(format!("Failed to delete sessions: {}", e)))?;
         Ok(())
@@ -179,9 +184,14 @@ impl Database {
 
     pub async fn get_sessions_by_user_id(&self, user_id: &str) -> Result<Vec<crate::models::session::Session>> {
         let query = "SELECT * FROM session WHERE user_id = type::thing($user_id) ORDER BY created_at DESC";
+        let user_thing_str = if user_id.starts_with("user:") {
+            user_id.to_string()
+        } else {
+            format!("user:{}", user_id)
+        };
         let mut result = self.client
             .query(query)
-            .bind(("user_id", format!("user:{}", user_id)))
+            .bind(("user_id", user_thing_str))
             .await
             .map_err(|e| AuthError::DatabaseError(format!("Failed to query sessions: {}", e)))?;
         

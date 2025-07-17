@@ -4,6 +4,7 @@ use lettre::{
     transport::smtp::authentication::Credentials,
     Message, SmtpTransport, Transport,
 };
+use std::time::Duration;
 
 pub struct EmailService {
     config: Config,
@@ -20,10 +21,24 @@ impl EmailService {
             self.config.smtp_password.clone(),
         );
 
+        // 如果启用了代理，设置环境变量
+        if self.config.proxy_enabled {
+            if let Some(proxy_url) = &self.config.proxy_url {
+                // 为当前进程设置代理环境变量
+                std::env::set_var("HTTPS_PROXY", proxy_url);
+                std::env::set_var("HTTP_PROXY", proxy_url);
+                std::env::set_var("https_proxy", proxy_url);
+                std::env::set_var("http_proxy", proxy_url);
+                
+                tracing::info!("设置代理环境变量: {}", proxy_url);
+            }
+        }
+
         let transport = SmtpTransport::starttls_relay(&self.config.smtp_host)
             .map_err(|e| AuthError::ServerError(format!("Failed to create SMTP transport: {}", e)))?
             .port(self.config.smtp_port)
             .credentials(creds)
+            .timeout(Some(Duration::from_secs(60))) // 增加超时时间
             .build();
 
         Ok(transport)

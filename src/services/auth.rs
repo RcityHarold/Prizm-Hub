@@ -226,7 +226,7 @@ impl AuthService {
             is_email_verified: false,
             verification_token: Some(verification_token.clone()),
             account_status: crate::models::user::AccountStatus::Active,
-            last_login_at: 0,
+            last_login_at: Some(now),
             last_login_ip: None,
         };
 
@@ -361,8 +361,13 @@ impl AuthService {
             id: Uuid::new_v4().to_string().into(),
         };
 
-        let user_thing: Thing = format!("user:{}", user_id).parse()
-            .map_err(|_| AuthError::InvalidUserId)?;
+        let user_thing: Thing = if user_id.starts_with("user:") {
+            // 如果已经包含前缀，直接解析
+            user_id.parse().map_err(|_| AuthError::InvalidUserId)?
+        } else {
+            // 如果没有前缀，添加前缀后解析
+            format!("user:{}", user_id).parse().map_err(|_| AuthError::InvalidUserId)?
+        };
 
         let session = Session {
             id: Some(session_id.clone()),
@@ -438,8 +443,13 @@ impl AuthService {
     }
 
     pub async fn initialize_password(&self, user_id: &str, password: &str) -> Result<User> {
-        let thing: Thing = format!("user:{}", user_id).parse()
-            .map_err(|_| AuthError::InvalidUserId)?;
+        let thing: Thing = if user_id.starts_with("user:") {
+            // 如果已经包含前缀，直接解析
+            user_id.parse().map_err(|_| AuthError::InvalidUserId)?
+        } else {
+            // 如果没有前缀，添加前缀后解析
+            format!("user:{}", user_id).parse().map_err(|_| AuthError::InvalidUserId)?
+        };
 
         let mut user: User = self.db.find_record_by_field("user", "id", user_id)
             .await?

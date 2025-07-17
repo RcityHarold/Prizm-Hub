@@ -16,6 +16,7 @@ pub struct User {
     pub is_email_verified: bool,
     pub verification_token: Option<String>,
     pub account_status: AccountStatus,
+    #[serde(with = "chrono::serde::ts_seconds_option")]
     pub last_login_at: Option<DateTime<Utc>>,
     pub last_login_ip: Option<String>,
 }
@@ -56,6 +57,7 @@ pub struct UserResponse {
     pub created_at: DateTime<Utc>,
     pub has_password: bool,
     pub account_status: AccountStatus,
+    #[serde(with = "chrono::serde::ts_seconds_option")]
     pub last_login_at: Option<DateTime<Utc>>,
 }
 

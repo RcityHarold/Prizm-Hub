@@ -194,6 +194,7 @@ PROXY_URL=http://your-proxy:port
 ```bash
 cargo build
 cargo run
+HTTP_PROXY=http://192.168.101.121:7890 HTTPS_PROXY=http://192.168.101.121:7890 cargo run
 ```
 
 ## 数据库结构
