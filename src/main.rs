@@ -45,6 +45,24 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Starting auth service...");
 
+    // 检查是否处于安装模式（通过检查docs系统的安装状态）
+    let docs_install_marker = "../Rainbow-docs/.rainbow_docs_installed";
+    if !std::path::Path::new(docs_install_marker).exists() {
+        info!("System appears to be in installation mode. Auth service will wait for installation to complete...");
+        
+        // 等待安装完成
+        loop {
+            if std::path::Path::new(docs_install_marker).exists() {
+                info!("Installation completed. Starting auth service...");
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
+        
+        // 安装完成后等待一下，让数据库稳定
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    }
+
     // 加载配置
     dotenv::dotenv().ok();
     let config = Config::from_env()?;
